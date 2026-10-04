@@ -1,0 +1,27 @@
+# Project Connect code ownership.
+#
+# Only real GitHub users/teams may appear here. During solo development the
+# repository owner is the single owner of every area. Areas are listed
+# separately (ADR-051 high-risk domains first) so that each line can be handed
+# to a real team when one exists, without restructuring this file.
+#
+# Rules are last-match-wins: more specific paths must stay below the default.
+
+# Default owner
+*                                   @Vamsi271278
+
+# Governance and Claude operating configuration
+/CLAUDE.md                          @Vamsi271278
+/.claude/                           @Vamsi271278
+/docs/                              @Vamsi271278
+
+# High-risk domains (ADR-051): specialist review required once a team exists
+/apps/api/src/shared/auth/          @Vamsi271278
+/apps/api/src/modules/identity/     @Vamsi271278
+/apps/api/src/modules/trust-safety/ @Vamsi271278
+/apps/api/src/modules/billing/      @Vamsi271278
+/apps/api/src/modules/admin/        @Vamsi271278
+**/migrations/                      @Vamsi271278
+/infrastructure/                    @Vamsi271278
+/.github/workflows/                 @Vamsi271278
+/scripts/                           @Vamsi271278
