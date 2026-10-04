@@ -1,0 +1,23 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Install policy — see docs/architecture/PHASE-1-DECISIONS.md (G4, pnpm build policy).
+saveExact: true
+engineStrict: true
+
+# Supply-chain cooldown: versions younger than 2 days (minutes) are not resolved.
+# Do not disable; pick a mature compatible version or wait and re-review.
+minimumReleaseAge: 2880
+
+# Dependency build scripts: nothing is allowed by default. Every `true` entry
+# requires human dependency approval. strictDepBuilds fails installs on any
+# unreviewed build script instead of silently skipping it.
+strictDepBuilds: true
+allowBuilds:
+  # Reviewed 2026-10-04, DENIED. The postinstall only adds a network-download
+  # fallback for the native binding; the platform binding is installed via
+  # optionalDependencies and resolution works without the script.
+  # Needed by eslint-plugin-import-x (import-x/no-cycle). Do not set to true
+  # unless a platform demonstrably cannot resolve without the fallback.
+  unrs-resolver: false

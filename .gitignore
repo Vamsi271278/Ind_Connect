@@ -19,6 +19,12 @@ build/
 .next/
 .expo/
 coverage/
+.turbo/
+*.tsbuildinfo
+
+# Expo generated native projects (continuous native generation)
+apps/mobile/ios/
+apps/mobile/android/
 
 # system
 .DS_Store
@@ -34,7 +40,7 @@ Thumbs.db
 *.tfstate
 *.tfstate.*
 .terraform/
-.terraform.lock.hcl
+# .terraform.lock.hcl is intentionally committed (HashiCorp guidance)
 
 # certificates / keys
 *.pem
