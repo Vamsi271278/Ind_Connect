@@ -1,0 +1,53 @@
+# dependencies
+node_modules/
+
+# local env (never commit real environment files)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.staging
+.env.production
+.env.test
+
+# allow safe template
+!.env.example
+
+# build
+dist/
+build/
+.next/
+.expo/
+coverage/
+
+# system
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# certificates / keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Claude local settings (personal overrides)
+.claude/settings.local.json
+
+# test output
+test-results/
+playwright-report/
+
+# logs
+*.log
