@@ -170,3 +170,49 @@ Use current `allowBuilds`, not obsolete `onlyBuiltDependencies`. Every `allowBui
 Approved A2 set: `pnpm 12.8.2`, `turbo 2.11.7`, `typescript 6.0.3`, `@types/node 24.19.1`, `prettier 3.9.9`, `eslint 9.39.5`, `@eslint/js 9.39.5`, `typescript-eslint 8.71.0`, `eslint-plugin-import-x 4.17.1`, `globals 17.13.0`, `vitest 5.0.3`, `@vitest/coverage-v8 5.0.3`, `vite 8.3.2`.
 
 Not approved for A2: `@swc/core`, `unplugin-swc`, `tsx`, `esbuild` (direct), Drizzle, TanStack Query, Zustand, React Hook Form, SecureStore, Expo Notifications, OpenTelemetry SDK, Nest Swagger, Helmet, mobile component testing libraries.
+
+---
+
+# A2 Decisions
+
+Approved during A2 execution. Recorded as approved, without reinterpretation.
+
+## A2-1 — `unrs-resolver` build script: DENIED (frozen)
+
+```yaml
+allowBuilds:
+  unrs-resolver: false
+```
+
+- `unrs-resolver@1.12.2` is required by `eslint-plugin-import-x` (`import-x/no-cycle`); keep `eslint-plugin-import-x`.
+- The required platform-specific native resolver binary is installed through optional dependencies, and functional resolution succeeded without the postinstall script.
+- The postinstall fallback can download a binary from the network; it is not needed.
+- Do not set `unrs-resolver` to `true` unless CI or another platform actually demonstrates a resolver failure without the fallback.
+
+## A2-2 — Turbo agent guidance: OPTED OUT
+
+- `turbo.json` sets `"agentGuidance": false`; the Turbo-generated `AGENTS.md` was deleted.
+- Reason: Project Connect permits agent instructions only through the governed `CLAUDE.md` / `.claude` / approved documentation hierarchy. Dependencies must not inject additional AI governance instructions.
+
+## A2-3 — Machine pnpm
+
+- No repository pnpm wrapper.
+- The developer machine's active pnpm is pnpm 12.8.2, matching `"packageManager": "pnpm@12.8.2"` (installed by the developer: `npm install -g pnpm@12.8.2` under Node 24.21.0).
+- A project that genuinely requires another pnpm major should carry its own package-manager pin.
+
+## A2-4 — Known temporary development-tool constraint: ESLint 9
+
+ESLint 9 is required by the currently approved Expo/Next plugin ecosystem. Re-evaluate after framework compatibility with ESLint 10 is confirmed. npm marks `eslint@9.39.5` as deprecated; do not break the compatibility matrix to chase the deprecation warning.
+
+## A2-5 — Interpretation of A2 validation results
+
+| Check | Status |
+|---|---|
+| format:check | PASS |
+| lint | PASS |
+| typecheck | PASS |
+| test:unit | TOOLCHAIN PASS / ZERO WORKSPACE TESTS |
+| architecture:check | EXPECTED-INCOMPLETE (Phase 1 step 24 not yet executed) |
+| security:secrets | EXPECTED-INCOMPLETE (Phase 1 step 25 not yet executed) |
+
+Vitest/Turbo invocation is functional, but zero product tests currently exist. `test:unit` is not recorded as application-test coverage.
