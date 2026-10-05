@@ -1,0 +1,54 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "agentGuidance": false,
+  "globalDependencies": ["eslint.config.mjs", "tsconfig.base.json"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test:unit": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "//#lint:root": {
+      "inputs": [
+        "*.{js,mjs,cjs,ts}",
+        "scripts/**",
+        "apps/*/eslint.*.mjs",
+        "apps/mobile/eslint-config-expo.d.ts",
+        "tsconfig.json",
+        "tsconfig.base.json",
+        "package.json"
+      ]
+    },
+    "//#typecheck:root": {
+      "inputs": [
+        "*.{js,mjs,cjs,ts}",
+        "scripts/**",
+        "apps/*/eslint.*.mjs",
+        "apps/mobile/eslint-config-expo.d.ts",
+        "tsconfig.json",
+        "tsconfig.base.json",
+        "package.json"
+      ]
+    }
+  }
+}

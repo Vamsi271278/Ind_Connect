@@ -1,0 +1,22 @@
+# dependencies / build output
+node_modules
+dist
+build
+coverage
+.next
+.expo
+.turbo
+pnpm-lock.yaml
+
+# terraform state
+*.tfstate
+*.tfstate.*
+
+# Approved governance artifacts are preserved verbatim (ADR extracts are
+# verified byte-exact against ADR-PACK.md). Do not reformat.
+docs/
+.claude/
+CLAUDE.md
+
+# Untracked governance-package note, replaced when the scaffold exists
+README.md

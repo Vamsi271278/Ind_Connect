@@ -1,0 +1,22 @@
+# Project Connect line-ending policy (Phase 1, step 2).
+# Store and check out text files with LF on every OS, overriding any local
+# core.autocrlf setting, so formatting checks behave the same on Windows and CI.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets: never normalize or diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

@@ -41,6 +41,11 @@ const ASK = [
   [/\bremove-item\b[\s\S]*-recurse/i, 'recursive delete'],
   [/\bgit\s+(reset\s+--hard|clean\s+-[a-z]*f|checkout\s+--\s|restore\s)/i, 'destructive git operation'],
   [/\bdb:migrate\b|\bdrizzle-kit\s+(push|migrate)\b/i, 'database migration execution'],
+  // D8: Docker commands that can destroy local data (volumes, containers, images).
+  [/\bdocker(-compose|\s+compose)\b[\s\S]*\b(down|rm)\b[\s\S]*\s(-v|--volumes)(\s|$)/i, 'Docker removal including volumes (destroys local data)'],
+  [/\bdocker\s+volume\s+(rm|remove|prune)\b/i, 'Docker volume removal (destroys local data)'],
+  [/\bdocker\s+(system|container|image|builder)\s+prune\b/i, 'Docker prune (destroys local data)'],
+  [/\bdocker\s+(rm|container\s+rm)\b[\s\S]*\s(-v|--volumes)(\s|$)/i, 'Docker container removal with volumes'],
 ];
 
 // Decisions are returned as structured JSON on stdout with exit code 0, never via
