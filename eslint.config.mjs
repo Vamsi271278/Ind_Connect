@@ -87,6 +87,20 @@ export default defineConfig(
     },
   },
   {
+    // node:test describe/it return promises that the runner itself awaits.
+    files: ['scripts/**/*.test.mjs'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        {
+          allowForKnownSafeCalls: [
+            { from: 'package', package: 'node:test', name: ['describe', 'it', 'test', 'suite'] },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['apps/api/**/*.ts', 'apps/worker/**/*.ts'],
     rules: {
       'no-console': 'error',
