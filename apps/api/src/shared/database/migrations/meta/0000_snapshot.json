@@ -1,0 +1,553 @@
+{
+  "id": "0040335a-254e-4611-9c92-421bde453b78",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.user_sessions": {
+      "name": "user_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_family_id": {
+          "name": "token_family_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "refresh_token_hash": {
+          "name": "refresh_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_context": {
+          "name": "device_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revocation_reason": {
+          "name": "revocation_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replaced_by_session_id": {
+          "name": "replaced_by_session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rotated_at": {
+          "name": "rotated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "user_sessions_refresh_token_hash_uq": {
+          "name": "user_sessions_refresh_token_hash_uq",
+          "columns": [
+            {
+              "expression": "refresh_token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "user_sessions_user_id_idx": {
+          "name": "user_sessions_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "user_sessions_token_family_id_idx": {
+          "name": "user_sessions_token_family_id_idx",
+          "columns": [
+            {
+              "expression": "token_family_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_sessions_user_id_users_id_fk": {
+          "name": "user_sessions_user_id_users_id_fk",
+          "tableFrom": "user_sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "user_sessions_replaced_by_session_id_user_sessions_id_fk": {
+          "name": "user_sessions_replaced_by_session_id_user_sessions_id_fk",
+          "tableFrom": "user_sessions",
+          "tableTo": "user_sessions",
+          "columnsFrom": [
+            "replaced_by_session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "user_sessions_refresh_token_hash_ck": {
+          "name": "user_sessions_refresh_token_hash_ck",
+          "value": "\"user_sessions\".\"refresh_token_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "user_sessions_revocation_reason_ck": {
+          "name": "user_sessions_revocation_reason_ck",
+          "value": "\"user_sessions\".\"revocation_reason\" IS NULL OR \"user_sessions\".\"revocation_reason\" IN ('ROTATED','SUPERSEDED','REPLAY_REPLACED','LOGOUT','LOGOUT_ALL','REUSE_DETECTED','ACCOUNT_ACTION')"
+        },
+        "user_sessions_revocation_consistency_ck": {
+          "name": "user_sessions_revocation_consistency_ck",
+          "value": "(\"user_sessions\".\"revoked_at\" IS NULL) = (\"user_sessions\".\"revocation_reason\" IS NULL)"
+        },
+        "user_sessions_rotation_consistency_ck": {
+          "name": "user_sessions_rotation_consistency_ck",
+          "value": "(\"user_sessions\".\"revocation_reason\" IS NOT DISTINCT FROM 'ROTATED') = (\"user_sessions\".\"rotated_at\" IS NOT NULL)"
+        },
+        "user_sessions_rotation_link_ck": {
+          "name": "user_sessions_rotation_link_ck",
+          "value": "\"user_sessions\".\"rotated_at\" IS NULL OR \"user_sessions\".\"replaced_by_session_id\" IS NOT NULL"
+        },
+        "user_sessions_not_self_replaced_ck": {
+          "name": "user_sessions_not_self_replaced_ck",
+          "value": "\"user_sessions\".\"replaced_by_session_id\" <> \"user_sessions\".\"id\""
+        },
+        "user_sessions_expiry_ck": {
+          "name": "user_sessions_expiry_ck",
+          "value": "\"user_sessions\".\"expires_at\" > \"user_sessions\".\"created_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "phone_e164": {
+          "name": "phone_e164",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phone_verified_at": {
+          "name": "phone_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date_of_birth": {
+          "name": "date_of_birth",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_status": {
+          "name": "account_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING_VERIFICATION'"
+        },
+        "onboarding_status": {
+          "name": "onboarding_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "onboarding_step": {
+          "name": "onboarding_step",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discoverable": {
+          "name": "discoverable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "last_active_at": {
+          "name": "last_active_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "users_phone_e164_not_deleted_uq": {
+          "name": "users_phone_e164_not_deleted_uq",
+          "columns": [
+            {
+              "expression": "phone_e164",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"users\".\"account_status\" <> 'DELETED'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "users_phone_e164_format_ck": {
+          "name": "users_phone_e164_format_ck",
+          "value": "\"users\".\"phone_e164\" ~ '^\\+[1-9][0-9]{6,14}$'"
+        },
+        "users_account_status_ck": {
+          "name": "users_account_status_ck",
+          "value": "\"users\".\"account_status\" IN ('ACTIVE','PENDING_VERIFICATION','LIMITED','UNDER_REVIEW','SUSPENDED','BANNED','DEACTIVATED','DELETION_PENDING','DELETED')"
+        },
+        "users_onboarding_status_ck": {
+          "name": "users_onboarding_status_ck",
+          "value": "\"users\".\"onboarding_status\" IN ('NOT_STARTED','IN_PROGRESS','COMPLETE')"
+        },
+        "users_onboarding_step_ck": {
+          "name": "users_onboarding_step_ck",
+          "value": "\"users\".\"onboarding_step\" IN ('AGE','PHONE','NAME','GENDER','LOCATION','INTENT','LANGUAGE','INTERESTS','PHOTO','ABOUT','VERIFICATION','NOTIFICATIONS','COMPLETE')"
+        },
+        "users_date_of_birth_floor_ck": {
+          "name": "users_date_of_birth_floor_ck",
+          "value": "\"users\".\"date_of_birth\" >= DATE '1900-01-01'"
+        },
+        "users_minimum_age_at_creation_ck": {
+          "name": "users_minimum_age_at_creation_ck",
+          "value": "\"users\".\"date_of_birth\" <= ((\"users\".\"created_at\" AT TIME ZONE 'Etc/GMT+12')::date - INTERVAL '18 years')::date"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.audit_events": {
+      "name": "audit_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "actor_type": {
+          "name": "actor_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action_code": {
+          "name": "action_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "correlation_id": {
+          "name": "correlation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "audit_events_actor_type_ck": {
+          "name": "audit_events_actor_type_ck",
+          "value": "\"audit_events\".\"actor_type\" IN ('USER','ADMIN','SYSTEM','SERVICE')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.gender_options": {
+      "name": "gender_options",
+      "schema": "",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_profiles": {
+      "name": "user_profiles",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gender_code": {
+          "name": "gender_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gender_self_description": {
+          "name": "gender_self_description",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_profiles_user_id_users_id_fk": {
+          "name": "user_profiles_user_id_users_id_fk",
+          "tableFrom": "user_profiles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "user_profiles_gender_code_gender_options_code_fk": {
+          "name": "user_profiles_gender_code_gender_options_code_fk",
+          "tableFrom": "user_profiles",
+          "tableTo": "gender_options",
+          "columnsFrom": [
+            "gender_code"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "user_profiles_first_name_not_blank_ck": {
+          "name": "user_profiles_first_name_not_blank_ck",
+          "value": "\"user_profiles\".\"first_name\" IS NULL OR length(btrim(\"user_profiles\".\"first_name\")) > 0"
+        },
+        "user_profiles_gender_self_description_ck": {
+          "name": "user_profiles_gender_self_description_ck",
+          "value": "\"user_profiles\".\"gender_self_description\" IS NULL OR (\"user_profiles\".\"gender_code\" IS NOT NULL AND \"user_profiles\".\"gender_code\" = 'SELF_DESCRIBE')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
