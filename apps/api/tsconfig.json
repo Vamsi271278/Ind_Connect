@@ -14,5 +14,5 @@
     "incremental": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "*.ts"]
+  "include": ["src", "test", "scripts", "*.ts"]
 }

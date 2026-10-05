@@ -17,7 +17,7 @@ export interface AppConfig {
   readonly redis: { readonly url: Secret };
   readonly otp: {
     readonly provider: 'fake';
-    readonly fakeCode: Secret | undefined;
+    readonly fakeCode: Secret;
     readonly codeTtlSeconds: number;
     readonly maxAttempts: number;
     readonly resendCooldownSeconds: number;
@@ -107,10 +107,8 @@ const envSchema = z
     REDIS_URL: connectionUrl(['redis:', 'rediss:']),
 
     OTP_PROVIDER: z.enum(['fake']),
-    OTP_FAKE_CODE: z
-      .string()
-      .regex(/^\d{6}$/)
-      .optional(),
+    // Required while 'fake' is the only provider; becomes conditional with Twilio.
+    OTP_FAKE_CODE: z.string().regex(/^\d{6}$/),
     OTP_CODE_TTL_SECONDS: positiveInt(300),
     OTP_MAX_ATTEMPTS: positiveInt(5),
     OTP_RESEND_COOLDOWN_SECONDS: positiveInt(30),
@@ -141,18 +139,13 @@ const envSchema = z
     IDEMPOTENCY_LOCK_SECONDS: positiveInt(30),
   })
   .superRefine((env, ctx) => {
-    if (env.OTP_PROVIDER === 'fake' && env.NODE_ENV === 'production') {
+    // 'fake' is the only provider until the Twilio adapter is approved, so
+    // production cannot start at all.
+    if (env.NODE_ENV === 'production') {
       ctx.addIssue({
         code: 'custom',
         path: ['OTP_PROVIDER'],
         message: 'the fake OTP provider can never run in production',
-      });
-    }
-    if (env.OTP_PROVIDER === 'fake' && env.OTP_FAKE_CODE === undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['OTP_FAKE_CODE'],
-        message: 'required when OTP_PROVIDER=fake',
       });
     }
     if (env.SESSION_FAMILY_MAX_DAYS < env.REFRESH_TOKEN_ROLLING_DAYS) {
@@ -190,7 +183,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     redis: { url: new Secret(e.REDIS_URL) },
     otp: {
       provider: e.OTP_PROVIDER,
-      fakeCode: e.OTP_FAKE_CODE === undefined ? undefined : new Secret(e.OTP_FAKE_CODE),
+      fakeCode: new Secret(e.OTP_FAKE_CODE),
       codeTtlSeconds: e.OTP_CODE_TTL_SECONDS,
       maxAttempts: e.OTP_MAX_ATTEMPTS,
       resendCooldownSeconds: e.OTP_RESEND_COOLDOWN_SECONDS,

@@ -39,8 +39,13 @@ const PLACEHOLDER_VALUE =
   /example|placeholder|change[_-]?me|dummy|sample|fake|redacted|your[_-]|xxx|local|test|\$\{|<|process\.env|import\.meta/i;
 
 const SECRET_KEY_NAME =
-  /[\w.-]*(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)[\w.-]*/i
+  /(?<key>[\w.-]*(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)[\w.-]*)/i
     .source;
+
+// Metadata that merely shares a secret-like prefix (ACCESS_TOKEN_AUDIENCE,
+// ACCESS_TOKEN_TTL_SECONDS, PRIVATE_KEY_ID, …) is not itself a secret.
+const NON_SECRET_KEY_SUFFIX =
+  /(?:issuer|audience|ttl\w*|key[_-]?id|header|algorithm|type|name|expires?\w*)$/i;
 
 /** @type {Rule[]} */
 export const RULES = [
@@ -71,13 +76,13 @@ export const RULES = [
   {
     // Code: a secret-like name assigned a quoted literal.
     id: 'hardcoded-secret',
-    pattern: new RegExp(`${SECRET_KEY_NAME}["']?\\s*[:=]\\s*["']([^"'\\s]{12,})["']`, 'i'),
+    pattern: new RegExp(`${SECRET_KEY_NAME}["']?\\s*[:=]\\s*["'](?<value>[^"'\\s]{12,})["']`, 'i'),
     appliesTo: (relPath) => !relPath.endsWith('.md') && !CONFIG_FILE.test(relPath),
   },
   {
     // Configuration: quoted or unquoted values.
     id: 'hardcoded-secret',
-    pattern: new RegExp(`${SECRET_KEY_NAME}["']?\\s*[:=]\\s*["']?([^"'\\s#]{12,})`, 'i'),
+    pattern: new RegExp(`${SECRET_KEY_NAME}["']?\\s*[:=]\\s*["']?(?<value>[^"'\\s#]{12,})`, 'i'),
     appliesTo: (relPath) => CONFIG_FILE.test(relPath),
   },
 ];
@@ -111,8 +116,10 @@ export function scanText(relPath, text) {
     for (const rule of rules) {
       const match = rule.pattern.exec(line);
       if (!match) continue;
-      const captured = match[1];
-      if (captured !== undefined && PLACEHOLDER_VALUE.test(captured)) continue;
+      const key = match.groups?.key;
+      const value = match.groups?.value;
+      if (key !== undefined && NON_SECRET_KEY_SUFFIX.test(key)) continue;
+      if (value !== undefined && PLACEHOLDER_VALUE.test(value)) continue;
       findings.push({ path: relPath, line: index + 1, rule: rule.id });
     }
   });

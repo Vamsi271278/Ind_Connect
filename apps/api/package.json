@@ -15,7 +15,10 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "test:integration": "vitest run --config ./vitest.config.integration.ts",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
+    "keys:generate": "node scripts/generate-access-token-key.ts"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",

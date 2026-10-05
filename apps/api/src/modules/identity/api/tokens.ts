@@ -1,0 +1,3 @@
+export const SESSION_SERVICE = Symbol('SESSION_SERVICE');
+export const OTP_SERVICE = Symbol('OTP_SERVICE');
+export const REGISTRATION_SERVICE = Symbol('REGISTRATION_SERVICE');
