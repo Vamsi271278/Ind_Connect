@@ -116,3 +116,71 @@ jobs:
         run: pnpm --filter @project-connect/mobile export:android
         env:
           EXPO_OFFLINE: '1'
+
+  integration:
+    name: Integration (PostgreSQL + Redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Same digest-pinned images as compose.yaml (G1/G2). Test-only credentials;
+    # these containers exist only for the duration of the job.
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
+        env:
+          POSTGRES_USER: project_connect_ci
+          POSTGRES_PASSWORD: test_only_ci_password
+          POSTGRES_DB: project_connect_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U project_connect_ci -d project_connect_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7.2.16-alpine@sha256:29e8589c3f9ba699b5f7aa4b3c7733c58852a3626439e619aa0ee78de08c6ca0
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://project_connect_ci:test_only_ci_password@localhost:5432/project_connect_test
+      TEST_REDIS_URL: redis://localhost:6379/15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Verify exact toolchain
+        run: |
+          test "$(node --version)" = "v$(cat .nvmrc)"
+          test "$(pnpm --version)" = "$(node -p "require('./package.json').packageManager.split('@')[1]")"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API contracts
+        run: pnpm --filter @project-connect/api-contracts build
+
+      - name: Apply migrations (ephemeral CI database)
+        run: pnpm --filter @project-connect/api db:migrate
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+
+      - name: Integration tests
+        run: pnpm --filter @project-connect/api test:integration

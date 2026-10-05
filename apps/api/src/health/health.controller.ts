@@ -1,5 +1,7 @@
 import { Controller, Get, Header } from '@nestjs/common';
 
+import { RawResponse } from '../shared/http/data-envelope.interceptor.js';
+
 export interface HealthResponse {
   readonly status: 'ok';
   readonly service: 'api';
@@ -11,6 +13,7 @@ export interface HealthResponse {
  * reserved /api/v1 and /admin/v1 prefixes.
  */
 @Controller('health')
+@RawResponse()
 export class HealthController {
   @Get()
   @Header('Cache-Control', 'no-store')

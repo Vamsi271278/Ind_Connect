@@ -15,12 +15,18 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "test:integration": "vitest run --config ./vitest.config.integration.ts",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
+    "keys:generate": "node scripts/generate-access-token-key.ts"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",
     "@nestjs/core": "12.1.2",
     "@nestjs/platform-express": "12.1.2",
+    "@project-connect/api-contracts": "workspace:*",
+    "drizzle-orm": "0.45.3",
+    "jose": "6.2.12",
     "pg": "8.23.1",
     "redis": "6.3.0",
     "reflect-metadata": "0.2.2",
@@ -33,6 +39,7 @@
     "@types/express": "5.0.6",
     "@types/pg": "8.23.1",
     "@types/supertest": "7.2.1",
+    "drizzle-kit": "0.31.11",
     "supertest": "7.3.0"
   }
 }

@@ -67,6 +67,26 @@ describe('check-secrets', () => {
     assert.deepEqual(scanText('apps/api/src/x.ts', text), []);
   });
 
+  it('ignores non-secret metadata keys that share a secret-like prefix', () => {
+    const text = [
+      'ACCESS_TOKEN_AUDIENCE=project-connect-mobile',
+      'ACCESS_TOKEN_ISSUER=project-connect-prod',
+      'ACCESS_TOKEN_TTL_SECONDS=900000000000',
+      'ACCESS_TOKEN_KEY_ID=prod-2026-10-05',
+    ].join('\n');
+    assert.deepEqual(scanText('.env.example', text), []);
+  });
+
+  it('still flags the secret itself next to that metadata', () => {
+    const value = token('', 24, 'q7Z');
+    assert.deepEqual(rulesFor('.env.example', `ACCESS_TOKEN_SECRET=${value}`), [
+      'hardcoded-secret',
+    ]);
+    assert.deepEqual(rulesFor('.env.example', `ACCESS_TOKEN_PRIVATE_KEY=${value}`), [
+      'hardcoded-secret',
+    ]);
+  });
+
   it('does not apply generic assignment matching to documentation', () => {
     const line = `password = '${token('', 20, 'q7Z')}'`;
     assert.deepEqual(rulesFor('docs/guide.md', line), []);

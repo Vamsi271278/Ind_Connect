@@ -1,27 +1,22 @@
-import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AppModule } from '../src/app.module.js';
-import { configureApp } from '../src/bootstrap/configure-app.js';
+
+import { createTestApp } from './support/test-app.js';
 
 describe('GET /health (e2e)', () => {
   let app: NestExpressApplication;
+  let close: () => Promise<void>;
 
   beforeEach(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = configureApp(moduleRef.createNestApplication<NestExpressApplication>());
-    await app.init();
+    ({ app, close } = await createTestApp());
   });
 
   afterEach(async () => {
-    await app.close();
+    await close();
   });
 
-  it('returns the minimal liveness payload', async () => {
+  it('returns the minimal liveness payload, unwrapped', async () => {
     const response = await request(app.getHttpServer())
       .get('/health')
       .expect(200)
@@ -42,7 +37,7 @@ describe('GET /health (e2e)', () => {
     await request(app.getHttpServer()).get('/admin/v1/health').expect(404);
   });
 
-  it('no longer serves the scaffold root route', async () => {
+  it('does not serve the scaffold root route', async () => {
     await request(app.getHttpServer()).get('/').expect(404);
   });
 });
