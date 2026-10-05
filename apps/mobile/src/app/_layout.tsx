@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 
 import { AppProviders, useAppState } from '@/app-shell/session-provider';
 import type { AppRoute } from '@/core/app-route';
-import { useTheme } from '@/ui/theme';
+import { useTheme } from '@project-connect/ui';
 
 const STATUS_ROUTES: ReadonlySet<AppRoute> = new Set([
   'loading',

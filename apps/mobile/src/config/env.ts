@@ -19,3 +19,13 @@ const rawApiBaseUrl: unknown = process.env.EXPO_PUBLIC_API_BASE_URL;
 export const apiBaseUrl: URL | undefined = parseHttpUrl(
   typeof rawApiBaseUrl === 'string' ? rawApiBaseUrl : undefined,
 );
+
+// Public legal documents. Unset until legal publishes them; the Welcome links
+// then explain that the documents are not available yet.
+const rawTermsUrl: unknown = process.env.EXPO_PUBLIC_TERMS_URL;
+const rawPrivacyUrl: unknown = process.env.EXPO_PUBLIC_PRIVACY_URL;
+
+export const legalUrls = {
+  terms: parseHttpUrl(typeof rawTermsUrl === 'string' ? rawTermsUrl : undefined),
+  privacy: parseHttpUrl(typeof rawPrivacyUrl === 'string' ? rawPrivacyUrl : undefined),
+};
