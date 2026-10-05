@@ -16,6 +16,7 @@
     "@hookform/resolvers": "5.9.1",
     "@project-connect/api-contracts": "workspace:*",
     "@project-connect/design-tokens": "workspace:*",
+    "@project-connect/ui": "workspace:*",
     "@tanstack/react-query": "5.104.0",
     "expo": "57.0.26",
     "expo-constants": "57.0.20",

@@ -118,8 +118,8 @@ const IMPORT_SPECIFIER =
 
 const SOURCE_FILE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 
-/** Application source (excluding tests/fixtures) that must use design tokens. */
-const APP_UI_SOURCE = /^apps\/[^/]+\/src\//;
+/** App and shared-UI source (excluding tests/fixtures) that must use design tokens. */
+const APP_UI_SOURCE = /^(?:apps\/[^/]+|packages\/ui)\/src\//;
 const TEST_OR_FIXTURE = /(?:\.(?:test|spec|e2e-spec|int-spec)\.[cm]?[jt]sx?$|\/__fixtures__\/)/;
 
 /** A colour literal inside a string: '#abc', "#aabbcc", `#aabbccdd`, 'rgb(', 'hsl('. */
@@ -377,7 +377,7 @@ export const CHECKS = {
         check: 'no-raw-colors',
         path: file,
         message:
-          'Raw colour literal in app source: use @project-connect/design-tokens semantic roles (CLAUDE.md §24).',
+          'Raw colour literal in app/UI source: use @project-connect/design-tokens semantic roles (CLAUDE.md §24).',
       })),
 
   'platform-wrappers': (repo) => {

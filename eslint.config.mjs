@@ -30,6 +30,8 @@ export default defineConfig(
   { name: 'project-connect/admin-next', basePath: 'apps/admin', extends: [adminNext] },
   { basePath: 'apps/mobile', ignores: ['expo-env.d.ts'] },
   { name: 'project-connect/mobile-expo', basePath: 'apps/mobile', extends: [mobileExpo] },
+  // packages/ui is React Native code consumed by mobile: same framework rules.
+  { name: 'project-connect/ui-expo', basePath: 'packages/ui', extends: [mobileExpo] },
 
   tseslint.configs.strictTypeChecked,
 

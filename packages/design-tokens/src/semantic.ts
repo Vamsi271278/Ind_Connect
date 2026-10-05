@@ -3,20 +3,46 @@ import { fontWeight, palette } from './primitives.js';
 /** Semantic colour roles (DESIGN-SYSTEM §10–§12). Feature code binds to these. */
 export interface ColorRoles {
   readonly background: { readonly primary: string; readonly secondary: string };
-  readonly surface: { readonly primary: string; readonly secondary: string };
-  readonly text: {
+  readonly surface: {
     readonly primary: string;
     readonly secondary: string;
-    readonly tertiary: string;
+    /** Selected selection rows / chips. */
+    readonly selected: string;
+  };
+  readonly text: {
+    readonly primary: string;
+    /** Body copy, helper text, captions and placeholders (≥ 4.5:1). */
+    readonly secondary: string;
+    /** Large or non-essential text only (≥ 3:1). */
+    readonly muted: string;
     readonly inverse: string;
     readonly disabled: string;
+    readonly link: string;
   };
-  readonly border: { readonly default: string; readonly strong: string; readonly focus: string };
+  readonly border: {
+    /** Decorative dividers and card outlines. */
+    readonly default: string;
+    /** Input / selection boundaries (≥ 3:1, WCAG 1.4.11). */
+    readonly field: string;
+    readonly focus: string;
+  };
   readonly action: {
     readonly primary: string;
     readonly primaryPressed: string;
-    readonly secondary: string;
     readonly onPrimary: string;
+    readonly disabled: string;
+    readonly onDisabled: string;
+  };
+  /** Brand moments: splash background, logo. */
+  readonly brand: { readonly core: string; readonly onCore: string; readonly mark: string };
+  /** Low-prominence background shapes and abstract artwork. */
+  readonly decor: {
+    readonly indigo: string;
+    readonly indigoSoft: string;
+    readonly coral: string;
+    readonly coralSoft: string;
+    readonly teal: string;
+    readonly tealSoft: string;
   };
   readonly success: StatusRole;
   readonly warning: StatusRole;
@@ -35,21 +61,32 @@ export interface StatusRole {
 const p = palette;
 
 export const lightColors: ColorRoles = {
-  background: { primary: p.neutral[0], secondary: p.neutral[50] },
-  surface: { primary: p.neutral[0], secondary: p.neutral[50] },
+  background: { primary: p.neutral[25], secondary: p.neutral[50] },
+  surface: { primary: p.neutral[0], secondary: p.brand[50], selected: p.brand[50] },
   text: {
-    primary: p.neutral[900],
+    primary: p.ink,
     secondary: p.neutral[600],
-    tertiary: p.neutral[500],
+    muted: p.neutral[500],
     inverse: p.neutral[0],
-    disabled: p.neutral[400],
+    disabled: p.neutral[500],
+    link: p.brand[600],
   },
-  border: { default: p.neutral[200], strong: p.neutral[500], focus: p.brand[600] },
+  border: { default: p.neutral[200], field: p.neutral[500], focus: p.brand[500] },
   action: {
     primary: p.brand[600],
     primaryPressed: p.brand[700],
-    secondary: p.brand[50],
     onPrimary: p.neutral[0],
+    disabled: p.neutral[200],
+    onDisabled: p.neutral[500],
+  },
+  brand: { core: p.brand[500], onCore: p.neutral[0], mark: p.brand[600] },
+  decor: {
+    indigo: p.brand[300],
+    indigoSoft: p.brand[100],
+    coral: p.accent[500],
+    coralSoft: p.accent[100],
+    teal: p.teal[500],
+    tealSoft: p.teal[100],
   },
   success: { background: p.success.light, text: p.success.base, border: p.success.border },
   warning: { background: p.warning.light, text: p.warning.base, border: p.warning.border },
@@ -59,33 +96,44 @@ export const lightColors: ColorRoles = {
   verification: p.verification.light,
 };
 
-/** Dark mode via semantic tokens (ADR-092): tonal surfaces, not shadows. */
+/** Dark mode: same identity, tonal surfaces, softened brand (ADR-092). */
 export const darkColors: ColorRoles = {
-  background: { primary: p.neutral[950], secondary: p.neutral[900] },
-  surface: { primary: p.neutral[900], secondary: p.neutral[800] },
+  background: { primary: p.neutral[950], secondary: p.neutral[925] },
+  surface: { primary: p.neutral[900], secondary: p.neutral[850], selected: p.brandOnDark.soft },
   text: {
     primary: p.neutral[50],
     secondary: p.neutral[300],
-    tertiary: p.neutral[400],
+    muted: p.neutral[400],
     inverse: p.neutral[950],
-    disabled: p.neutral[600],
+    disabled: p.neutral[500],
+    link: p.brand[300],
   },
-  border: { default: p.neutral[800], strong: p.neutral[500], focus: p.brand[400] },
+  border: { default: p.neutral[800], field: p.neutral[500], focus: p.brandOnDark.base },
   action: {
-    primary: p.brand[400],
-    primaryPressed: p.brand[300],
-    secondary: p.neutral[800],
+    primary: p.brandOnDark.base,
+    primaryPressed: p.brandOnDark.pressed,
     onPrimary: p.neutral[950],
+    disabled: p.neutral[800],
+    onDisabled: p.neutral[400],
   },
-  success: { background: p.success.dark, text: p.success.onDark, border: p.success.base },
+  brand: { core: p.brand[500], onCore: p.neutral[0], mark: p.brand[300] },
+  decor: {
+    indigo: p.brandOnDark.base,
+    indigoSoft: p.brandOnDark.soft,
+    coral: p.accent[400],
+    coralSoft: p.decorOnDark.coral,
+    teal: p.teal[500],
+    tealSoft: p.decorOnDark.teal,
+  },
+  success: { background: p.success.dark, text: p.success.onDark, border: p.success.border },
   warning: { background: p.warning.dark, text: p.warning.onDark, border: p.warning.base },
-  error: { background: p.error.dark, text: p.error.onDark, border: p.error.base },
-  info: { background: p.info.dark, text: p.info.onDark, border: p.info.base },
-  context: { dating: p.accent[300], datingSoft: p.accent[900] },
+  error: { background: p.error.dark, text: p.error.onDark, border: p.error.borderOnDark },
+  info: { background: p.info.dark, text: p.info.onDark, border: p.info.border },
+  context: { dating: p.accent[400], datingSoft: p.decorOnDark.coral },
   verification: p.verification.dark,
 };
 
-/** Type roles (§16–§17). Sizes scale with Dynamic Type at render (§19). */
+/** Type roles (V1 §4). Sizes scale with Dynamic Type / font scale at render (§19). */
 export interface TextStyleToken {
   readonly fontSize: number;
   readonly lineHeight: number;
@@ -93,20 +141,19 @@ export interface TextStyleToken {
 }
 
 export const typography = {
-  displayLarge: { fontSize: 32, lineHeight: 40, fontWeight: fontWeight.bold },
-  displayMedium: { fontSize: 28, lineHeight: 36, fontWeight: fontWeight.bold },
-  headingXl: { fontSize: 24, lineHeight: 32, fontWeight: fontWeight.semibold },
-  headingLg: { fontSize: 22, lineHeight: 30, fontWeight: fontWeight.semibold },
-  headingMd: { fontSize: 20, lineHeight: 28, fontWeight: fontWeight.semibold },
-  headingSm: { fontSize: 18, lineHeight: 24, fontWeight: fontWeight.semibold },
-  bodyLg: { fontSize: 17, lineHeight: 24, fontWeight: fontWeight.regular },
-  bodyMd: { fontSize: 16, lineHeight: 22, fontWeight: fontWeight.regular },
-  bodySm: { fontSize: 14, lineHeight: 20, fontWeight: fontWeight.regular },
-  labelLg: { fontSize: 16, lineHeight: 20, fontWeight: fontWeight.medium },
-  labelMd: { fontSize: 14, lineHeight: 18, fontWeight: fontWeight.medium },
-  labelSm: { fontSize: 12, lineHeight: 16, fontWeight: fontWeight.medium },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: fontWeight.regular },
+  display: { fontSize: 36, lineHeight: 42, fontWeight: fontWeight.bold },
+  h1: { fontSize: 30, lineHeight: 36, fontWeight: fontWeight.bold },
+  h2: { fontSize: 24, lineHeight: 30, fontWeight: fontWeight.bold },
+  h3: { fontSize: 20, lineHeight: 26, fontWeight: fontWeight.semibold },
+  bodyLarge: { fontSize: 18, lineHeight: 27, fontWeight: fontWeight.regular },
+  body: { fontSize: 16, lineHeight: 24, fontWeight: fontWeight.regular },
+  bodyStrong: { fontSize: 16, lineHeight: 24, fontWeight: fontWeight.semibold },
+  label: { fontSize: 14, lineHeight: 20, fontWeight: fontWeight.semibold },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: fontWeight.regular },
+  small: { fontSize: 12, lineHeight: 16, fontWeight: fontWeight.medium },
 } as const satisfies Record<string, TextStyleToken>;
+
+export type TypographyVariant = keyof typeof typography;
 
 export type ColorScheme = 'light' | 'dark';
 

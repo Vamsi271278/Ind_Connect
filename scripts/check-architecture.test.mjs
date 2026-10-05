@@ -180,6 +180,7 @@ describe('check-architecture', () => {
       'apps/mobile/src/a.tsx': "const s = { color: '#4A47C2' };\n",
       'apps/mobile/src/b.tsx': 'const s = { color: "#fff" };\n',
       'apps/admin/src/c.tsx': "const s = { color: 'rgba(0, 0, 0, 0.5)' };\n",
+      'packages/ui/src/d.tsx': "const s = { color: '#5B55E7' };\n",
       'apps/mobile/src/ok.tsx': 'const s = { color: colors.text.primary }; // see issue #123\n',
       'apps/mobile/src/ok.test.ts': "expect(x).toBe('#ffffff');\n",
       'packages/design-tokens/src/primitives.ts': "export const brand = '#4A47C2';\n",
@@ -190,6 +191,7 @@ describe('check-architecture', () => {
       'apps/admin/src/c.tsx',
       'apps/mobile/src/a.tsx',
       'apps/mobile/src/b.tsx',
+      'packages/ui/src/d.tsx',
     ]);
   });
 
