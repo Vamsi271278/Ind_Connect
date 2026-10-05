@@ -1,0 +1,19 @@
+/* Neutral foundation shell. Project Connect design tokens arrive with
+   packages/design-tokens; until then use system colors and fonts only. */
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  background: Canvas;
+  color: CanvasText;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+}
