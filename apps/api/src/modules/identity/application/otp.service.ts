@@ -1,4 +1,5 @@
 import type { CountryPolicy } from '../../../config/app-config.js';
+import type { AnalyticsTracker } from '../../../shared/analytics/analytics.js';
 import { type KeyedHasher, generateOpaqueToken, sha256Hex } from '../../../shared/crypto/crypto.js';
 import { ApplicationError } from '../../../shared/errors/application-error.js';
 import { canUseSelfService } from '../domain/account.js';
@@ -60,6 +61,7 @@ export interface OtpServiceDependencies {
   readonly countryPolicy: CountryPolicy;
   readonly clock: Clock;
   readonly logger: EventLogger;
+  readonly analytics: AnalyticsTracker;
 }
 
 export class OtpService {
@@ -244,6 +246,8 @@ export class OtpService {
         this.deps.sessions.startSession(repository, user.id, device),
       );
       this.deps.logger.log({ event: 'otp.verified', phoneHash, outcome: 'signed_in' });
+      // After commit, first execution only (replays never re-emit).
+      this.deps.analytics.track({ name: 'otp_verified', userId: user.id });
       return {
         value: { result: 'authenticated', session, account: user },
         outcome: { type: 'session', sessionId: session.sessionId },
@@ -257,6 +261,7 @@ export class OtpService {
       phoneVerifiedAt: this.deps.clock.now().toISOString(),
     });
     this.deps.logger.log({ event: 'otp.verified', phoneHash, outcome: 'registration_required' });
+    this.deps.analytics.track({ name: 'otp_verified', userId: null });
     return {
       value: {
         result: 'registration_required',

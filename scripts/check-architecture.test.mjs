@@ -174,4 +174,37 @@ describe('check-architecture', () => {
     assert.deepEqual(checksFailing(root), ['import-boundaries']);
     assert.equal(violations.length, 4);
   });
+
+  it('rejects raw colour literals in app source, not in tokens, tests or prose', () => {
+    const root = fixtureRepo({
+      'apps/mobile/src/a.tsx': "const s = { color: '#4A47C2' };\n",
+      'apps/mobile/src/b.tsx': 'const s = { color: "#fff" };\n',
+      'apps/admin/src/c.tsx': "const s = { color: 'rgba(0, 0, 0, 0.5)' };\n",
+      'apps/mobile/src/ok.tsx': 'const s = { color: colors.text.primary }; // see issue #123\n',
+      'apps/mobile/src/ok.test.ts': "expect(x).toBe('#ffffff');\n",
+      'packages/design-tokens/src/primitives.ts': "export const brand = '#4A47C2';\n",
+    });
+    const violations = checkArchitecture(root);
+    assert.deepEqual(checksFailing(root), ['no-raw-colors']);
+    assert.deepEqual(violations.map((v) => v.path).sort(), [
+      'apps/admin/src/c.tsx',
+      'apps/mobile/src/a.tsx',
+      'apps/mobile/src/b.tsx',
+    ]);
+  });
+
+  it('allows expo-crypto and expo-secure-store only in their D11 wrappers', () => {
+    const root = fixtureRepo({
+      'apps/mobile/src/platform/random.ts': "import { randomUUID } from 'expo-crypto';\n",
+      'apps/mobile/src/platform/secure-store.ts': "import * as S from 'expo-secure-store';\n",
+      'apps/mobile/src/core/x.ts': "import { randomUUID } from 'expo-crypto';\n",
+      'apps/mobile/src/app/y.tsx': "import * as S from 'expo-secure-store';\n",
+    });
+    const violations = checkArchitecture(root);
+    assert.deepEqual(checksFailing(root), ['platform-wrappers']);
+    assert.deepEqual(violations.map((v) => v.path).sort(), [
+      'apps/mobile/src/app/y.tsx',
+      'apps/mobile/src/core/x.ts',
+    ]);
+  });
 });

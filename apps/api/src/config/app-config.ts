@@ -49,6 +49,12 @@ export interface AppConfig {
   };
   readonly refresh: { readonly perFamilyPerHour: number };
   readonly idempotency: { readonly ttlSeconds: number; readonly lockSeconds: number };
+  /** ADR-076 public bootstrap state (ADR-032 flag store not built yet: config only). */
+  readonly bootstrap: {
+    readonly maintenanceMode: boolean;
+    readonly minimumSupportedVersion: string;
+    readonly featureFlags: Readonly<Record<string, boolean>>;
+  };
 }
 
 const positiveInt = (fallback: number) => z.coerce.number().int().positive().default(fallback);
@@ -81,6 +87,24 @@ const countryPolicySchema = z
     }
     return { mode: 'allowlist', countries: new Set(codes) };
   });
+
+const booleanFlag = z.enum(['true', 'false']).transform((value) => value === 'true');
+
+const featureFlagsSchema = z.string().transform((raw, ctx): Record<string, boolean> => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = undefined;
+  }
+  const flags = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.boolean()).safeParse(parsed);
+  if (flags.success) return flags.data;
+  ctx.addIssue({
+    code: 'custom',
+    message: 'must be a JSON object of snake_case flag names to booleans',
+  });
+  return z.NEVER;
+});
 
 const ed25519PrivateKeySchema = z.string().transform((raw, ctx): KeyObject => {
   try {
@@ -137,6 +161,13 @@ const envSchema = z
 
     IDEMPOTENCY_TTL_SECONDS: positiveInt(3600),
     IDEMPOTENCY_LOCK_SECONDS: positiveInt(30),
+
+    MAINTENANCE_MODE: booleanFlag.default(false),
+    MOBILE_MINIMUM_SUPPORTED_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/)
+      .default('0.0.0'),
+    FEATURE_FLAGS: featureFlagsSchema.default({}),
   })
   .superRefine((env, ctx) => {
     // 'fake' is the only provider until the Twilio adapter is approved, so
@@ -214,5 +245,10 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     },
     refresh: { perFamilyPerHour: e.REFRESHES_PER_FAMILY_PER_HOUR },
     idempotency: { ttlSeconds: e.IDEMPOTENCY_TTL_SECONDS, lockSeconds: e.IDEMPOTENCY_LOCK_SECONDS },
+    bootstrap: {
+      maintenanceMode: e.MAINTENANCE_MODE,
+      minimumSupportedVersion: e.MOBILE_MINIMUM_SUPPORTED_VERSION,
+      featureFlags: e.FEATURE_FLAGS,
+    },
   });
 }

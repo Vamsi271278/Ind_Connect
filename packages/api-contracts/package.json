@@ -12,8 +12,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test:unit": "vitest run"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p scripts",
+    "test:unit": "vitest run",
+    "openapi:generate": "node scripts/openapi.ts",
+    "openapi:check": "node scripts/openapi.ts --check"
   },
   "dependencies": {
     "libphonenumber-js": "1.13.14",

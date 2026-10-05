@@ -1,0 +1,1481 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Project Connect Consumer API",
+    "version": "0.1.0",
+    "description": "Consumer API (`/api/v1`). Success responses use `{ \"data\": … }`; errors use the stable `{ \"error\": { code, message, correlationId } }` envelope. Clients branch on `error.code`."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth"
+    },
+    {
+      "name": "users"
+    },
+    {
+      "name": "app"
+    },
+    {
+      "name": "operations"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "operations"
+        ],
+        "summary": "Liveness (outside the /api/v1 namespace; not enveloped)",
+        "responses": {
+          "200": {
+            "description": "Process is serving HTTP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "service"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    },
+                    "service": {
+                      "const": "api"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/app/bootstrap": {
+      "get": {
+        "operationId": "getBootstrap",
+        "tags": [
+          "app"
+        ],
+        "summary": "Public app bootstrap state (ADR-076); account only with a valid access token",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bootstrap state",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/BootstrapResponse"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/otp/request": {
+      "post": {
+        "operationId": "requestOtp",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start a phone verification; identical response for every accepted number",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Code sent",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OtpRequestResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/otp/verify": {
+      "post": {
+        "operationId": "verifyOtp",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Verify the code; signs in an existing account or returns a registration token",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpVerifyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OtpVerifyResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/registrations": {
+      "post": {
+        "operationId": "register",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create the account from a registration token and date of birth (server age authority)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RegistrationResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "refreshSession",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Rotate the refresh token",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RefreshResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "tags": [
+          "auth"
+        ],
+        "summary": "End the sign-in that owns this refresh token (always 204)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Signed out",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout-all": {
+      "post": {
+        "operationId": "logoutAll",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke every session of the authenticated user",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "All sessions revoked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "operationId": "getMe",
+        "tags": [
+          "users"
+        ],
+        "summary": "Own-account projection (masked phone, computed age; never DOB)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Own account",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SelfUser"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/profile": {
+      "patch": {
+        "operationId": "updateMyProfile",
+        "tags": [
+          "users"
+        ],
+        "summary": "Update onboarding profile fields (first name, gender); advances onboarding",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated own account",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SelfUser"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Ed25519-signed access token (15 minutes)."
+      }
+    },
+    "parameters": {
+      "CorrelationId": {
+        "name": "X-Correlation-ID",
+        "in": "header",
+        "required": false,
+        "description": "Optional client correlation ID (8–64 chars of [A-Za-z0-9-]); echoed back.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]{8,64}$"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "UUID per user submission; reuse it for network retries of the same submission. A different payload with the same key is rejected.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "headers": {
+      "CorrelationId": {
+        "description": "Request correlation ID",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Validation failure (VALIDATION_FAILED, PHONE_INVALID, OTP_EXPIRED, …)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Not authenticated (AUTH_REQUIRED, SESSION_INVALID)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Account cannot use this operation (ACCOUNT_NOT_ACTIVE)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Idempotency or uniqueness conflict",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error422": {
+        "description": "Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "Rate limited; see Retry-After (RATE_LIMITED, OTP_ATTEMPTS_EXCEEDED)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Dependency unavailable; fails closed (OTP_UNAVAILABLE, SERVICE_UNAVAILABLE)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "VALIDATION_FAILED",
+                  "PHONE_INVALID",
+                  "PHONE_COUNTRY_NOT_SUPPORTED",
+                  "IDEMPOTENCY_KEY_REQUIRED",
+                  "AUTH_REQUIRED",
+                  "SESSION_INVALID",
+                  "ACCOUNT_NOT_ACTIVE",
+                  "IDEMPOTENCY_KEY_REUSED",
+                  "REQUEST_IN_PROGRESS",
+                  "REPLAY_UNAVAILABLE",
+                  "PHONE_ALREADY_REGISTERED",
+                  "OTP_INCORRECT",
+                  "OTP_EXPIRED",
+                  "OTP_ATTEMPTS_EXCEEDED",
+                  "REGISTRATION_TOKEN_INVALID",
+                  "AGE_NOT_ELIGIBLE",
+                  "RATE_LIMITED",
+                  "OTP_UNAVAILABLE",
+                  "SERVICE_UNAVAILABLE",
+                  "NOT_FOUND",
+                  "INTERNAL_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "correlationId": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "properties": {
+                  "retryAfterSeconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "issues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "code"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "correlationId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "OtpRequestBody": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "installId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "phone",
+          "installId"
+        ],
+        "additionalProperties": false
+      },
+      "OtpRequestResponse": {
+        "type": "object",
+        "properties": {
+          "expiresInSeconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resendAvailableInSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "expiresInSeconds",
+          "resendAvailableInSeconds"
+        ],
+        "additionalProperties": false
+      },
+      "OtpVerifyBody": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "ios",
+                  "android"
+                ]
+              },
+              "appVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "osVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "installId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "platform",
+              "appVersion",
+              "osVersion",
+              "installId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "phone",
+          "code",
+          "device"
+        ],
+        "additionalProperties": false
+      },
+      "OtpVerifyResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "result": {
+                "type": "string",
+                "const": "authenticated"
+              },
+              "session": {
+                "type": "object",
+                "properties": {
+                  "accessToken": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "accessTokenExpiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "refreshToken": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  },
+                  "refreshTokenExpiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  }
+                },
+                "required": [
+                  "accessToken",
+                  "accessTokenExpiresAt",
+                  "refreshToken",
+                  "refreshTokenExpiresAt"
+                ],
+                "additionalProperties": false
+              },
+              "account": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "accountStatus": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "PENDING_VERIFICATION",
+                      "LIMITED",
+                      "UNDER_REVIEW",
+                      "SUSPENDED",
+                      "BANNED",
+                      "DEACTIVATED",
+                      "DELETION_PENDING",
+                      "DELETED"
+                    ]
+                  },
+                  "onboardingStatus": {
+                    "type": "string",
+                    "enum": [
+                      "NOT_STARTED",
+                      "IN_PROGRESS",
+                      "COMPLETE"
+                    ]
+                  },
+                  "onboardingStep": {
+                    "type": "string",
+                    "enum": [
+                      "AGE",
+                      "PHONE",
+                      "NAME",
+                      "GENDER",
+                      "LOCATION",
+                      "INTENT",
+                      "LANGUAGE",
+                      "INTERESTS",
+                      "PHOTO",
+                      "ABOUT",
+                      "VERIFICATION",
+                      "NOTIFICATIONS",
+                      "COMPLETE"
+                    ]
+                  }
+                },
+                "required": [
+                  "userId",
+                  "accountStatus",
+                  "onboardingStatus",
+                  "onboardingStep"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "result",
+              "session",
+              "account"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "result": {
+                "type": "string",
+                "const": "registration_required"
+              },
+              "registrationToken": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              "registrationTokenExpiresInSeconds": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "result",
+              "registrationToken",
+              "registrationTokenExpiresInSeconds"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "RegistrationBody": {
+        "type": "object",
+        "properties": {
+          "registrationToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "dateOfBirth": {
+            "type": "string"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "ios",
+                  "android"
+                ]
+              },
+              "appVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "osVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "installId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "platform",
+              "appVersion",
+              "osVersion",
+              "installId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "registrationToken",
+          "dateOfBirth",
+          "device"
+        ],
+        "additionalProperties": false
+      },
+      "RegistrationResponse": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "const": "authenticated"
+          },
+          "session": {
+            "type": "object",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "minLength": 1
+              },
+              "accessTokenExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "refreshToken": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              "refreshTokenExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "accessToken",
+              "accessTokenExpiresAt",
+              "refreshToken",
+              "refreshTokenExpiresAt"
+            ],
+            "additionalProperties": false
+          },
+          "account": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "accountStatus": {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "PENDING_VERIFICATION",
+                  "LIMITED",
+                  "UNDER_REVIEW",
+                  "SUSPENDED",
+                  "BANNED",
+                  "DEACTIVATED",
+                  "DELETION_PENDING",
+                  "DELETED"
+                ]
+              },
+              "onboardingStatus": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "onboardingStep": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "userId",
+              "accountStatus",
+              "onboardingStatus",
+              "onboardingStep"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "result",
+          "session",
+          "account"
+        ],
+        "additionalProperties": false
+      },
+      "RefreshBody": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "ios",
+                  "android"
+                ]
+              },
+              "appVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "osVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "installId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "platform",
+              "appVersion",
+              "osVersion",
+              "installId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "refreshToken",
+          "device"
+        ],
+        "additionalProperties": false
+      },
+      "RefreshResponse": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "minLength": 1
+              },
+              "accessTokenExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "refreshToken": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              "refreshTokenExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "accessToken",
+              "accessTokenExpiresAt",
+              "refreshToken",
+              "refreshTokenExpiresAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "additionalProperties": false
+      },
+      "LogoutBody": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateProfileBody": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string"
+          },
+          "genderCode": {
+            "type": "string",
+            "enum": [
+              "WOMAN",
+              "MAN",
+              "NON_BINARY",
+              "SELF_DESCRIBE",
+              "PREFER_NOT_TO_SAY"
+            ]
+          },
+          "genderSelfDescription": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SelfUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "accountStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PENDING_VERIFICATION",
+              "LIMITED",
+              "UNDER_REVIEW",
+              "SUSPENDED",
+              "BANNED",
+              "DEACTIVATED",
+              "DELETION_PENDING",
+              "DELETED"
+            ]
+          },
+          "onboarding": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "step"
+            ],
+            "additionalProperties": false
+          },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "genderCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "WOMAN",
+                      "MAN",
+                      "NON_BINARY",
+                      "SELF_DESCRIBE",
+                      "PREFER_NOT_TO_SAY"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "genderSelfDescription": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "firstName",
+              "genderCode",
+              "genderSelfDescription"
+            ],
+            "additionalProperties": false
+          },
+          "phoneMasked": {
+            "type": "string"
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "accountStatus",
+          "onboarding",
+          "profile",
+          "phoneMasked",
+          "age"
+        ],
+        "additionalProperties": false
+      },
+      "BootstrapResponse": {
+        "type": "object",
+        "properties": {
+          "maintenanceMode": {
+            "type": "boolean"
+          },
+          "minimumSupportedVersion": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          },
+          "featureFlags": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "PENDING_VERIFICATION",
+                      "LIMITED",
+                      "UNDER_REVIEW",
+                      "SUSPENDED",
+                      "BANNED",
+                      "DEACTIVATED",
+                      "DELETION_PENDING",
+                      "DELETED"
+                    ]
+                  },
+                  "onboardingStatus": {
+                    "type": "string",
+                    "enum": [
+                      "NOT_STARTED",
+                      "IN_PROGRESS",
+                      "COMPLETE"
+                    ]
+                  },
+                  "onboardingStep": {
+                    "type": "string",
+                    "enum": [
+                      "AGE",
+                      "PHONE",
+                      "NAME",
+                      "GENDER",
+                      "LOCATION",
+                      "INTENT",
+                      "LANGUAGE",
+                      "INTERESTS",
+                      "PHOTO",
+                      "ABOUT",
+                      "VERIFICATION",
+                      "NOTIFICATIONS",
+                      "COMPLETE"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "onboardingStatus",
+                  "onboardingStep"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "maintenanceMode",
+          "minimumSupportedVersion",
+          "featureFlags",
+          "account"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

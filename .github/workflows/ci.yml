@@ -71,6 +71,11 @@ jobs:
       - name: Guard script tests
         run: pnpm test:scripts
 
+      # Contracts are built by the Turbo tasks above; the committed OpenAPI 3.1
+      # artifact must match what the Zod contracts generate.
+      - name: OpenAPI drift check
+        run: pnpm openapi:check
+
       - name: Architecture check
         run: pnpm architecture:check
 

@@ -75,3 +75,21 @@ export function assessAge(dateOfBirth: CalendarDate, now: Date): AgeAssessment {
 
 export const formatCalendarDate = (date: CalendarDate): string =>
   `${String(date.year).padStart(4, '0')}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+
+/**
+ * Whole years of age at the UTC-12 reference date — the same conservative
+ * boundary as eligibility, so a displayed age never runs ahead of the true age.
+ */
+export function ageInYears(dateOfBirth: CalendarDate, now: Date): number {
+  const reference = eligibilityReferenceDate(now);
+  let years = reference.year - dateOfBirth.year;
+  if (
+    compare(
+      { year: dateOfBirth.year + years, month: dateOfBirth.month, day: dateOfBirth.day },
+      reference,
+    ) > 0
+  ) {
+    years -= 1;
+  }
+  return years;
+}

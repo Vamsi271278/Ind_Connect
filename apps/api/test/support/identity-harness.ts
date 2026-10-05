@@ -19,7 +19,14 @@ import { RegistrationService } from '../../src/modules/identity/application/regi
 import { SessionService } from '../../src/modules/identity/application/session.service.js';
 import { FakePhoneVerificationProvider } from '../../src/modules/identity/infrastructure/otp/fake-phone-verification.provider.js';
 import { JoseAccessTokenService } from '../../src/modules/identity/infrastructure/tokens/jose-access-token.service.js';
+import { BootstrapService } from '../../src/modules/configuration/application/bootstrap.service.js';
+import { OnboardingProgressService } from '../../src/modules/identity/application/onboarding-progress.service.js';
+import { SelfAccountQuery } from '../../src/modules/identity/application/self-account.query.js';
+import { ProfileService } from '../../src/modules/profile/application/profile.service.js';
+import { AnalyticsTracker } from '../../src/shared/analytics/analytics.js';
 import { KeyedHasher } from '../../src/shared/crypto/crypto.js';
+import { InMemoryAnalyticsProvider } from './in-memory-analytics.js';
+import { InMemoryProfileStore, InMemoryUnitOfWork } from './in-memory-profile.js';
 import { InMemoryEphemeralStore } from './in-memory-ephemeral-store.js';
 import { InMemoryIdentityStore } from './in-memory-identity-store.js';
 import { ManualClock } from './manual-clock.js';
@@ -76,8 +83,10 @@ export function createIdentityHarness(
   const ephemeral = new InMemoryEphemeralStore(clock);
   const store = new InMemoryIdentityStore();
   const logger = new CapturingLogger();
+  const analyticsProvider = new InMemoryAnalyticsProvider();
   const settings = { ...OTP_SETTINGS, ...options.settings };
   const hasher = new KeyedHasher(new Secret('test-pepper-0123456789abcdef0123456789'));
+  const analytics = new AnalyticsTracker(analyticsProvider, hasher, logger, () => clock.now());
   const rateLimiter = new RateLimiter(ephemeral);
   const idempotency = new IdempotencyRecords(ephemeral, { ttlMs: 3_600_000, lockMs: 30_000 });
   const registrationTokens = new RegistrationTokens(
@@ -127,12 +136,36 @@ export function createIdentityHarness(
       countryPolicy: options.countryPolicy ?? { mode: 'all' },
       clock,
       logger,
+      analytics,
     },
     settings,
   );
   const registration = new RegistrationService(
     { registrationTokens, idempotency, rateLimiter, store, sessions, hasher, clock, logger },
     { perIpPerHour: 20 },
+  );
+
+  const profiles = new InMemoryProfileStore();
+  const unitOfWork = new InMemoryUnitOfWork(store, profiles);
+  const onboarding = new OnboardingProgressService(store, clock);
+  const selfAccount = new SelfAccountQuery(store, clock);
+  const profileService = new ProfileService({
+    unitOfWork,
+    profiles,
+    onboarding,
+    selfAccount,
+    analytics,
+    clock,
+  });
+  const bootstrap = new BootstrapService(
+    {
+      maintenanceMode: false,
+      minimumSupportedVersion: '1.0.0',
+      featureFlags: { dating_enabled: false },
+    },
+    sessions,
+    selfAccount,
+    logger,
   );
 
   /** Full sign-up: request → verify → register. */
@@ -156,6 +189,13 @@ export function createIdentityHarness(
   }
 
   return {
+    analyticsProvider,
+    profiles,
+    unitOfWork,
+    onboarding,
+    selfAccount,
+    profileService,
+    bootstrap,
     clock,
     ephemeral,
     store,

@@ -1,0 +1,1 @@
+export const BOOTSTRAP_SERVICE = Symbol('BOOTSTRAP_SERVICE');

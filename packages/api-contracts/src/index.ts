@@ -8,5 +8,7 @@ export * from './dates.js';
 export * from './envelope.js';
 export * from './enums.js';
 export * from './errors.js';
+export * from './openapi.js';
 export * from './phone.js';
 export * from './profile.js';
+export * from './users.js';

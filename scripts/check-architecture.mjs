@@ -118,6 +118,23 @@ const IMPORT_SPECIFIER =
 
 const SOURCE_FILE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 
+/** Application source (excluding tests/fixtures) that must use design tokens. */
+const APP_UI_SOURCE = /^apps\/[^/]+\/src\//;
+const TEST_OR_FIXTURE = /(?:\.(?:test|spec|e2e-spec|int-spec)\.[cm]?[jt]sx?$|\/__fixtures__\/)/;
+
+/** A colour literal inside a string: '#abc', "#aabbcc", `#aabbccdd`, 'rgb(', 'hsl('. */
+const RAW_COLOR =
+  /['"`](?:#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})['"`]|(?:rgba?|hsla?)\s*\()/;
+
+/**
+ * Platform modules that may each be imported from exactly one wrapper (D11).
+ * @type {Record<string, string>}
+ */
+const SINGLE_IMPORT_WRAPPERS = {
+  'expo-crypto': 'apps/mobile/src/platform/random.ts',
+  'expo-secure-store': 'apps/mobile/src/platform/secure-store.ts',
+};
+
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -344,6 +361,37 @@ export const CHECKS = {
             check: 'import-boundaries',
             path: file,
             message: `Domain layer must not depend on frameworks/ORM/infrastructure (${specifier}).`,
+          });
+        }
+      }
+    }
+    return violations;
+  },
+
+  'no-raw-colors': (repo) =>
+    repo.files
+      .filter((file) => APP_UI_SOURCE.test(file) && SOURCE_FILE.test(file))
+      .filter((file) => !TEST_OR_FIXTURE.test(file))
+      .filter((file) => RAW_COLOR.test(repo.read(file)))
+      .map((file) => ({
+        check: 'no-raw-colors',
+        path: file,
+        message:
+          'Raw colour literal in app source: use @project-connect/design-tokens semantic roles (CLAUDE.md §24).',
+      })),
+
+  'platform-wrappers': (repo) => {
+    /** @type {Violation[]} */
+    const violations = [];
+    for (const file of repo.files) {
+      if (!file.startsWith('apps/')) continue;
+      for (const specifier of importSpecifiers(file, repo.read(file))) {
+        const wrapper = SINGLE_IMPORT_WRAPPERS[specifier];
+        if (wrapper !== undefined && file !== wrapper) {
+          violations.push({
+            check: 'platform-wrappers',
+            path: file,
+            message: `${specifier} may only be imported by ${wrapper} (D11 narrow wrapper).`,
           });
         }
       }

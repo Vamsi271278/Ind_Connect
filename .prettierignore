@@ -10,6 +10,8 @@ pnpm-lock.yaml
 
 # Drizzle migration artifacts: reviewed byte-for-byte as generated (P3).
 apps/api/src/shared/database/migrations/
+# Generated OpenAPI artifact: byte-checked by `openapi:check` in CI.
+packages/api-contracts/openapi.json
 
 # terraform state
 *.tfstate
