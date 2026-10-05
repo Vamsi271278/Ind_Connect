@@ -5,6 +5,9 @@ import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+import adminNext from './apps/admin/eslint.next.mjs';
+import mobileExpo from './apps/mobile/eslint.expo.mjs';
+
 export default defineConfig(
   {
     ignores: [
@@ -20,6 +23,14 @@ export default defineConfig(
   },
 
   js.configs.recommended,
+
+  // Framework layers, scoped per app. They come before the repository strict
+  // TypeScript rules so repository policy wins on any overlapping rule.
+  { basePath: 'apps/admin', ignores: ['next-env.d.ts', 'out/**'] },
+  { name: 'project-connect/admin-next', basePath: 'apps/admin', extends: [adminNext] },
+  { basePath: 'apps/mobile', ignores: ['expo-env.d.ts'] },
+  { name: 'project-connect/mobile-expo', basePath: 'apps/mobile', extends: [mobileExpo] },
+
   tseslint.configs.strictTypeChecked,
 
   {
@@ -35,7 +46,9 @@ export default defineConfig(
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
-      'import-x/no-cycle': 'error',
+      // Cycles inside third-party packages are not ours to police, and following
+      // imports into node_modules makes import-x parse react-native's Flow sources.
+      'import-x/no-cycle': ['error', { ignoreExternal: true }],
     },
   },
 
@@ -77,6 +90,8 @@ export default defineConfig(
     files: ['apps/api/**/*.ts', 'apps/worker/**/*.ts'],
     rules: {
       'no-console': 'error',
+      // Nest modules are decorated, intentionally empty classes.
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
     },
   },
 );

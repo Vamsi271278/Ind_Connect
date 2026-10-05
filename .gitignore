@@ -26,6 +26,16 @@ coverage/
 apps/mobile/ios/
 apps/mobile/android/
 
+# Expo (apps/mobile) generated / local tooling
+apps/mobile/expo-env.d.ts
+apps/mobile/.kotlin/
+apps/mobile/.metro-health-check*
+apps/mobile/**/*.orig.*
+
+# Next.js (apps/admin) generated
+apps/admin/next-env.d.ts
+apps/admin/out/
+
 # system
 .DS_Store
 Thumbs.db
@@ -47,6 +57,9 @@ Thumbs.db
 *.key
 *.p12
 *.pfx
+*.jks
+*.p8
+*.mobileprovision
 
 # Claude local settings (personal overrides)
 .claude/settings.local.json

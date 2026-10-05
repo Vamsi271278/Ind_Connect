@@ -9,5 +9,13 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["*.js", "*.mjs", "*.cjs", "*.ts", "scripts/**/*.mjs", "scripts/**/*.ts"]
+  "include": [
+    "*.js",
+    "*.mjs",
+    "*.cjs",
+    "*.ts",
+    "scripts/**/*.mjs",
+    "scripts/**/*.ts",
+    "apps/mobile/eslint-config-expo.d.ts"
+  ]
 }

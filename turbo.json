@@ -1,6 +1,7 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "agentGuidance": false,
+  "globalDependencies": ["eslint.config.mjs", "tsconfig.base.json"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -28,6 +29,8 @@
       "inputs": [
         "*.{js,mjs,cjs,ts}",
         "scripts/**",
+        "apps/*/eslint.*.mjs",
+        "apps/mobile/eslint-config-expo.d.ts",
         "tsconfig.json",
         "tsconfig.base.json",
         "package.json"
@@ -37,6 +40,8 @@
       "inputs": [
         "*.{js,mjs,cjs,ts}",
         "scripts/**",
+        "apps/*/eslint.*.mjs",
+        "apps/mobile/eslint-config-expo.d.ts",
         "tsconfig.json",
         "tsconfig.base.json",
         "package.json"
