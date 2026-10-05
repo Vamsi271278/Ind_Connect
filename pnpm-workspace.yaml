@@ -21,3 +21,13 @@ allowBuilds:
   # Needed by eslint-plugin-import-x (import-x/no-cycle). Do not set to true
   # unless a platform demonstrably cannot resolve without the fallback.
   unrs-resolver: false
+
+  # Reviewed 2026-10-05, DENIED.
+  # drizzle-kit's transitive esbuild versions have their platform binaries
+  # supplied through optionalDependencies. The postinstall verification /
+  # network-download fallback is unnecessary. CLI, JS API, and drizzle-kit
+  # config/schema loading were verified without the script.
+  # Package-wide on purpose: an esbuild that cannot find its binary must fail
+  # visibly, never repair itself from the network. Any drizzle-kit upgrade must
+  # re-run `drizzle-kit --version` and `drizzle-kit check` with this denial.
+  esbuild: false
