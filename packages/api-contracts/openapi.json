@@ -18,6 +18,9 @@
       "name": "users"
     },
     {
+      "name": "locations"
+    },
+    {
       "name": "app"
     },
     {
@@ -548,6 +551,127 @@
           }
         }
       }
+    },
+    "/api/v1/users/me/location": {
+      "patch": {
+        "operationId": "updateMyLocation",
+        "tags": [
+          "users"
+        ],
+        "summary": "Set the current city (manual selection; server derives metro/country). Allowed from the LOCATION onboarding step onward; advances LOCATION → INTENT",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyLocationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current location (city/metro only)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MyLocationResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          }
+        }
+      }
+    },
+    "/api/v1/locations/cities": {
+      "get": {
+        "operationId": "listCities",
+        "tags": [
+          "locations"
+        ],
+        "summary": "Selectable launch cities (bounded taxonomy; no coordinates)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Selectable cities",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CityListResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -636,7 +760,7 @@
         }
       },
       "Error409": {
-        "description": "Idempotency or uniqueness conflict",
+        "description": "State conflict (idempotency, uniqueness, ONBOARDING_STEP_NOT_REACHED)",
         "headers": {
           "X-Correlation-ID": {
             "$ref": "#/components/headers/CorrelationId"
@@ -651,7 +775,7 @@
         }
       },
       "Error422": {
-        "description": "Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE)",
+        "description": "Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE, CITY_NOT_AVAILABLE)",
         "headers": {
           "X-Correlation-ID": {
             "$ref": "#/components/headers/CorrelationId"
@@ -722,6 +846,8 @@
                   "OTP_ATTEMPTS_EXCEEDED",
                   "REGISTRATION_TOKEN_INVALID",
                   "AGE_NOT_ELIGIBLE",
+                  "ONBOARDING_STEP_NOT_REACHED",
+                  "CITY_NOT_AVAILABLE",
                   "RATE_LIMITED",
                   "OTP_UNAVAILABLE",
                   "SERVICE_UNAVAILABLE",
@@ -1473,6 +1599,207 @@
           "minimumSupportedVersion",
           "featureFlags",
           "account"
+        ],
+        "additionalProperties": false
+      },
+      "CityListResponse": {
+        "type": "object",
+        "properties": {
+          "cities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "stateRegion": {
+                  "type": "string"
+                },
+                "countryCode": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$"
+                },
+                "metro": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "launchStatus": {
+                  "type": "string",
+                  "enum": [
+                    "ACTIVE",
+                    "WAITLIST",
+                    "FUTURE",
+                    "DISABLED"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "stateRegion",
+                "countryCode",
+                "metro",
+                "launchStatus"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "cities"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateMyLocationBody": {
+        "type": "object",
+        "properties": {
+          "cityId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "cityId"
+        ],
+        "additionalProperties": false
+      },
+      "MyLocationResponse": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "stateRegion": {
+                    "type": "string"
+                  },
+                  "countryCode": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$"
+                  },
+                  "metro": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "code",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "launchStatus": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "WAITLIST",
+                      "FUTURE",
+                      "DISABLED"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "stateRegion",
+                  "countryCode",
+                  "metro",
+                  "launchStatus"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "city"
+            ],
+            "additionalProperties": false
+          },
+          "onboarding": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "step"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "location",
+          "onboarding"
         ],
         "additionalProperties": false
       }

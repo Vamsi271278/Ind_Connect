@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { ageInYears, parseCalendarDate } from './age.js';
+import { ONBOARDING_STEPS } from './account.js';
 import {
+  hasReachedLocationStep,
   isGenderComplete,
   isNameComplete,
   nextOnboardingState,
+  nextOnboardingStateAfterLocation,
   type OnboardingProfileFacts,
 } from './onboarding-progress.js';
 
@@ -74,6 +77,34 @@ describe('nextOnboardingState', () => {
     });
     for (const step of ['LOCATION', 'INTENT', 'COMPLETE'] as const) {
       expect(nextOnboardingState(at(step), facts())).toMatchObject({ step, completedSteps: [] });
+    }
+  });
+});
+
+describe('location step rule (B4.1-D3)', () => {
+  it('allows location only from LOCATION onward', () => {
+    const allowed = ONBOARDING_STEPS.filter(hasReachedLocationStep);
+    expect(allowed[0]).toBe('LOCATION');
+    for (const step of ['AGE', 'PHONE', 'NAME', 'GENDER'] as const) {
+      expect(hasReachedLocationStep(step)).toBe(false);
+    }
+    expect(hasReachedLocationStep('COMPLETE')).toBe(true);
+  });
+
+  it('advances exactly LOCATION → INTENT, reporting LOCATION once', () => {
+    expect(nextOnboardingStateAfterLocation(at('LOCATION'))).toEqual({
+      status: 'IN_PROGRESS',
+      step: 'INTENT',
+      completedSteps: ['LOCATION'],
+    });
+  });
+
+  it('is inert after LOCATION (never rewinds, never skips ahead)', () => {
+    for (const step of ['INTENT', 'COMPLETE'] as const) {
+      expect(nextOnboardingStateAfterLocation(at(step))).toEqual({
+        ...at(step),
+        completedSteps: [],
+      });
     }
   });
 });

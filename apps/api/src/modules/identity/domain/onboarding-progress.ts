@@ -10,7 +10,7 @@ export interface OnboardingProfileFacts {
   readonly genderSelfDescription: string | null;
 }
 
-/** This slice implements NAME and GENDER; users then park at LOCATION. */
+/** The profile rule (NAME, GENDER) ends at LOCATION; location has its own rule. */
 export const PARKING_STEP: OnboardingStep = 'LOCATION';
 
 const nonBlank = (value: string | null): boolean => value !== null && value.trim().length > 0;
@@ -56,4 +56,27 @@ export function nextOnboardingState(
     step,
     completedSteps: ONBOARDING_STEPS.slice(indexOf(current.step), indexOf(step)),
   };
+}
+
+const LOCATION_STEP: OnboardingStep = 'LOCATION';
+
+/**
+ * Location may be written only once onboarding has reached LOCATION (B4.1-D3):
+ * it is never collected early, while the user is still at NAME or GENDER.
+ */
+export const hasReachedLocationStep = (step: OnboardingStep): boolean =>
+  indexOf(step) >= indexOf(LOCATION_STEP);
+
+/**
+ * Applied after a location is saved. Exactly LOCATION → INTENT; at any later
+ * step (or COMPLETE) the location is edited and onboarding is untouched.
+ */
+export function nextOnboardingStateAfterLocation(current: {
+  readonly status: OnboardingStatus;
+  readonly step: OnboardingStep;
+}): OnboardingTransition {
+  if (current.step !== LOCATION_STEP) {
+    return { status: current.status, step: current.step, completedSteps: [] };
+  }
+  return { status: current.status, step: 'INTENT', completedSteps: [LOCATION_STEP] };
 }

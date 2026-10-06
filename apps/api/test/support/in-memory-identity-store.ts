@@ -8,6 +8,7 @@ import {
   type LockedSession,
   type NewSession,
   type NewUser,
+  type LockedOnboarding,
   type OnboardingState,
   PhoneAlreadyRegisteredError,
   type SelfAccountFacts,
@@ -265,10 +266,16 @@ class InMemoryIdentityRepository implements IdentityRepository {
     return Promise.resolve(user === undefined ? undefined : { ...user });
   }
 
-  lockOnboarding(userId: string): Promise<OnboardingState | undefined> {
+  lockOnboarding(userId: string): Promise<LockedOnboarding | undefined> {
     const user = this.user(userId);
     return Promise.resolve(
-      user === undefined ? undefined : { status: user.onboardingStatus, step: user.onboardingStep },
+      user === undefined
+        ? undefined
+        : {
+            status: user.onboardingStatus,
+            step: user.onboardingStep,
+            accountStatus: user.accountStatus,
+          },
     );
   }
 

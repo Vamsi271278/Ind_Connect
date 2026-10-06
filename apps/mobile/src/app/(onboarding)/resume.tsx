@@ -15,8 +15,10 @@ export default function ResumeOnboarding() {
       return <Redirect href="/name" />;
     case 'GENDER':
       return <Redirect href="/gender" />;
+    case 'LOCATION':
+      return <Redirect href="/location" />;
     default:
-      // LOCATION and later: the B3 holding screen until those slices exist.
+      // INTENT and later: the holding screen until B4.2 builds those steps.
       return <Redirect href="/setup-continue" />;
   }
 }

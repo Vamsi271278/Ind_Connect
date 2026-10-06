@@ -12,6 +12,11 @@ import {
   registrationResponseSchema,
 } from './auth.js';
 import { errorEnvelopeSchema } from './errors.js';
+import {
+  cityListResponseSchema,
+  myLocationResponseSchema,
+  updateMyLocationBodySchema,
+} from './locations.js';
 import { bootstrapResponseSchema, selfUserSchema, updateProfileBodySchema } from './users.js';
 
 type Json = Record<string, unknown>;
@@ -57,8 +62,8 @@ const ERROR_DESCRIPTIONS: Record<number, string> = {
   400: 'Validation failure (VALIDATION_FAILED, PHONE_INVALID, OTP_EXPIRED, …)',
   401: 'Not authenticated (AUTH_REQUIRED, SESSION_INVALID)',
   403: 'Account cannot use this operation (ACCOUNT_NOT_ACTIVE)',
-  409: 'Idempotency or uniqueness conflict',
-  422: 'Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE)',
+  409: 'State conflict (idempotency, uniqueness, ONBOARDING_STEP_NOT_REACHED)',
+  422: 'Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE, CITY_NOT_AVAILABLE)',
   429: 'Rate limited; see Retry-After (RATE_LIMITED, OTP_ATTEMPTS_EXCEEDED)',
   503: 'Dependency unavailable; fails closed (OTP_UNAVAILABLE, SERVICE_UNAVAILABLE)',
 };
@@ -81,7 +86,13 @@ export function buildOpenApiDocument(): Json {
         'Consumer API (`/api/v1`). Success responses use `{ "data": … }`; errors use the stable `{ "error": { code, message, correlationId } }` envelope. Clients branch on `error.code`.',
     },
     servers: [{ url: '/' }],
-    tags: [{ name: 'auth' }, { name: 'users' }, { name: 'app' }, { name: 'operations' }],
+    tags: [
+      { name: 'auth' },
+      { name: 'users' },
+      { name: 'locations' },
+      { name: 'app' },
+      { name: 'operations' },
+    ],
     paths: {
       '/health': {
         get: {
@@ -208,6 +219,34 @@ export function buildOpenApiDocument(): Json {
           },
         },
       },
+      '/api/v1/users/me/location': {
+        patch: {
+          operationId: 'updateMyLocation',
+          tags: ['users'],
+          summary:
+            'Set the current city (manual selection; server derives metro/country). Allowed from the LOCATION onboarding step onward; advances LOCATION → INTENT',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          requestBody: { required: true, ...jsonBody(ref('UpdateMyLocationBody')) },
+          responses: {
+            '200': success('Current location (city/metro only)', 'MyLocationResponse'),
+            ...errors(400, 401, 403, 409, 422),
+          },
+        },
+      },
+      '/api/v1/locations/cities': {
+        get: {
+          operationId: 'listCities',
+          tags: ['locations'],
+          summary: 'Selectable launch cities (bounded taxonomy; no coordinates)',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          responses: {
+            '200': success('Selectable cities', 'CityListResponse'),
+            ...errors(401, 403),
+          },
+        },
+      },
     },
     components: {
       securitySchemes: {
@@ -265,6 +304,9 @@ export function buildOpenApiDocument(): Json {
         UpdateProfileBody: jsonSchema(updateProfileBodySchema, 'input'),
         SelfUser: jsonSchema(selfUserSchema, 'output'),
         BootstrapResponse: jsonSchema(bootstrapResponseSchema, 'output'),
+        CityListResponse: jsonSchema(cityListResponseSchema, 'output'),
+        UpdateMyLocationBody: jsonSchema(updateMyLocationBodySchema, 'input'),
+        MyLocationResponse: jsonSchema(myLocationResponseSchema, 'output'),
       },
     },
   };

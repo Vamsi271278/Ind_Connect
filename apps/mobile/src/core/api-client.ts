@@ -1,9 +1,13 @@
 import {
   type BootstrapResponse,
   bootstrapResponseSchema,
+  type CityListResponse,
+  cityListResponseSchema,
   type DeviceContext,
   errorEnvelopeSchema,
   IDEMPOTENCY_KEY_HEADER,
+  type MyLocationResponse,
+  myLocationResponseSchema,
   type OtpRequestResponse,
   otpRequestResponseSchema,
   type OtpVerifyResponse,
@@ -14,6 +18,7 @@ import {
   registrationResponseSchema,
   type SelfUser,
   selfUserSchema,
+  type UpdateMyLocationBody,
   type UpdateProfileBody,
 } from '@project-connect/api-contracts';
 import { z } from 'zod';
@@ -238,6 +243,25 @@ export class ApiClient {
       path: '/api/v1/users/me/profile',
       body,
       schema: selfUserSchema,
+      auth: 'required',
+    });
+  }
+
+  listCities(): Promise<CityListResponse> {
+    return this.request({
+      method: 'GET',
+      path: '/api/v1/locations/cities',
+      schema: cityListResponseSchema,
+      auth: 'required',
+    });
+  }
+
+  updateMyLocation(body: UpdateMyLocationBody): Promise<MyLocationResponse> {
+    return this.request({
+      method: 'PATCH',
+      path: '/api/v1/users/me/location',
+      body,
+      schema: myLocationResponseSchema,
       auth: 'required',
     });
   }

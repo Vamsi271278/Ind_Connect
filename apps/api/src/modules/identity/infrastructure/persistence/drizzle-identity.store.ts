@@ -21,6 +21,7 @@ import {
   type LockedSession,
   type NewSession,
   type NewUser,
+  type LockedOnboarding,
   type OnboardingState,
   PhoneAlreadyRegisteredError,
   type SelfAccountFacts,
@@ -309,7 +310,7 @@ export class DrizzleIdentityRepository implements IdentityRepository {
       : { ...toUser(row), phoneE164: row.phoneE164, dateOfBirth: row.dateOfBirth };
   }
 
-  async lockOnboarding(userId: string): Promise<OnboardingState | undefined> {
+  async lockOnboarding(userId: string): Promise<LockedOnboarding | undefined> {
     const [row] = await this.db
       .select(userColumns)
       .from(users)
@@ -318,7 +319,11 @@ export class DrizzleIdentityRepository implements IdentityRepository {
       .limit(1);
     if (row === undefined) return undefined;
     const user = toUser(row);
-    return { status: user.onboardingStatus, step: user.onboardingStep };
+    return {
+      status: user.onboardingStatus,
+      step: user.onboardingStep,
+      accountStatus: user.accountStatus,
+    };
   }
 
   async updateOnboarding(userId: string, state: OnboardingState, at: Date): Promise<void> {

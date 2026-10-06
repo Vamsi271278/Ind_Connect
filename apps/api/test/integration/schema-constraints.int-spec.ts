@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -10,7 +10,7 @@ import type { Database } from '../../src/shared/database/database.module.js';
 import * as schema from '../../src/shared/database/schema/index.js';
 import { resetDatabase } from '../support/integration-db.js';
 
-const { users, userSessions, userProfiles, genderOptions } = schema;
+const { users, userSessions, userProfiles, genderOptions, metros, cities, userLocations } = schema;
 
 let pool: pg.Pool;
 let db: Database;
@@ -274,5 +274,182 @@ describe('transactions', () => {
       .from(users)
       .where(eq(users.phoneE164, '+12145550199'));
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('metros / cities / user_locations', () => {
+  const dfw = async () => {
+    const [row] = await db.select().from(metros).where(eq(metros.code, 'DFW'));
+    if (row === undefined) throw new Error('DFW seed missing');
+    return row;
+  };
+  const city = async (name: string) => {
+    const [row] = await db.select().from(cities).where(eq(cities.name, name));
+    if (row === undefined) throw new Error(`no city ${name}`);
+    return row;
+  };
+  const newUser = async (phone: string) => {
+    const [row] = await db
+      .insert(users)
+      .values(userValues({ phoneE164: phone, onboardingStep: 'LOCATION' }))
+      .returning();
+    if (row === undefined) throw new Error('user insert failed');
+    return row;
+  };
+  const manual = (
+    userId: string,
+    c: typeof cities.$inferSelect,
+    overrides: Partial<typeof userLocations.$inferInsert> = {},
+  ): typeof userLocations.$inferInsert => ({
+    userId,
+    cityId: c.id,
+    metroId: c.metroId,
+    countryCode: c.countryCode,
+    precisionType: 'MANUAL_CITY',
+    source: 'MANUAL',
+    capturedAt: new Date(),
+    ...overrides,
+  });
+
+  it('seeds the DFW metro and the 14 owner-approved ACTIVE cities', async () => {
+    expect(await dfw()).toMatchObject({
+      name: 'Dallas–Fort Worth',
+      countryCode: 'US',
+      timezone: 'America/Chicago',
+      launchStatus: 'ACTIVE',
+    });
+    const rows = await db
+      .select()
+      .from(cities)
+      .where(eq(cities.metroId, (await dfw()).id));
+    expect(rows.map((r) => r.name).sort()).toEqual(
+      [
+        'Allen',
+        'Arlington',
+        'Carrollton',
+        'Coppell',
+        'Dallas',
+        'Denton',
+        'Fort Worth',
+        'Frisco',
+        'Irving',
+        'Lewisville',
+        'McKinney',
+        'Plano',
+        'Prosper',
+        'Richardson',
+      ].sort(),
+    );
+    for (const row of rows) {
+      expect(row).toMatchObject({ stateRegion: 'TX', countryCode: 'US', launchStatus: 'ACTIVE' });
+    }
+  });
+
+  it('stores no coordinates anywhere in the location tables', async () => {
+    const result = await db.execute<{ column_name: string }>(
+      sql`SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name IN ('metros', 'cities', 'user_locations')`,
+    );
+    const columns = result.rows.map((r) => r.column_name);
+    for (const forbidden of ['latitude', 'longitude', 'location', 'geom', 'point']) {
+      expect(columns).not.toContain(forbidden);
+    }
+  });
+
+  it('accepts a consistent manual location, one row per user', async () => {
+    const user = await newUser('+12145550601');
+    await db.insert(userLocations).values(manual(user.id, await city('Frisco')));
+    expect(
+      await sqlState(db.insert(userLocations).values(manual(user.id, await city('Plano')))),
+    ).toBe('23505');
+  });
+
+  it('rejects a metro or country that does not match the city (composite FK)', async () => {
+    const user = await newUser('+12145550602');
+    const frisco = await city('Frisco');
+    const [other] = await db
+      .insert(metros)
+      .values({
+        code: 'ZZFK',
+        name: 'FK test',
+        countryCode: 'US',
+        timezone: 'UTC',
+        launchStatus: 'FUTURE',
+      })
+      .returning();
+    if (other === undefined) throw new Error('fixture metro');
+    try {
+      expect(
+        await sqlState(
+          db.insert(userLocations).values(manual(user.id, frisco, { metroId: other.id })),
+        ),
+      ).toBe('23503');
+      expect(
+        await sqlState(
+          db.insert(userLocations).values(manual(user.id, frisco, { countryCode: 'IN' })),
+        ),
+      ).toBe('23503');
+      // A city's country must match its metro's country.
+      expect(
+        await sqlState(
+          db.insert(cities).values({
+            metroId: (await dfw()).id,
+            name: 'Elsewhere',
+            stateRegion: 'MH',
+            countryCode: 'IN',
+            launchStatus: 'ACTIVE',
+          }),
+        ),
+      ).toBe('23503');
+    } finally {
+      await db.delete(metros).where(eq(metros.id, other.id));
+    }
+  });
+
+  it('allows only MANUAL_CITY / MANUAL in this slice', async () => {
+    const user = await newUser('+12145550603');
+    const frisco = await city('Frisco');
+    for (const overrides of [
+      { precisionType: 'DEVICE' },
+      { precisionType: 'APPROXIMATE' },
+      { source: 'GPS' },
+      { source: 'IP_APPROXIMATION' },
+    ]) {
+      expect(
+        await sqlState(db.insert(userLocations).values(manual(user.id, frisco, overrides))),
+      ).toBe('23514');
+    }
+  });
+
+  it('enforces reference-data shape: unique city per region, valid codes and statuses', async () => {
+    const metroId = (await dfw()).id;
+    const base = { metroId, stateRegion: 'TX', countryCode: 'US', launchStatus: 'ACTIVE' };
+    expect(await sqlState(db.insert(cities).values({ ...base, name: 'Frisco' }))).toBe('23505');
+    expect(await sqlState(db.insert(cities).values({ ...base, name: '  ' }))).toBe('23514');
+    expect(
+      await sqlState(db.insert(cities).values({ ...base, name: 'Nowhere', launchStatus: 'OPEN' })),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(metros).values({
+          code: 'dfw2',
+          name: 'Lower',
+          countryCode: 'US',
+          timezone: 'UTC',
+          launchStatus: 'ACTIVE',
+        }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(metros).values({
+          code: 'DFW',
+          name: 'Duplicate',
+          countryCode: 'US',
+          timezone: 'UTC',
+          launchStatus: 'ACTIVE',
+        }),
+      ),
+    ).toBe('23505');
   });
 });

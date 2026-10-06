@@ -46,6 +46,19 @@ describe('describeAuthFailure', () => {
   });
 });
 
+describe('location failures', () => {
+  it('explain an unavailable city or an out-of-order step without technical detail', () => {
+    expect(describeAuthFailure(api(422, 'CITY_NOT_AVAILABLE'))).toEqual({
+      kind: 'banner',
+      message: "That city isn't available right now. Please choose another.",
+    });
+    expect(describeAuthFailure(api(409, 'ONBOARDING_STEP_NOT_REACHED'))).toEqual({
+      kind: 'banner',
+      message: 'Please finish the earlier steps first.',
+    });
+  });
+});
+
 describe('describeNameIssue', () => {
   it('maps contract issue codes to copy', () => {
     expect(describeNameIssue('required', 'first name')).toBe('Enter your first name.');

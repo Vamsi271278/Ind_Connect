@@ -146,3 +146,83 @@ The approved V1 layouts change some SFS copy. These are recorded divergences unt
 - A03 mirrors the server rule (BR-AUTH-001, UTC−12 reference date, 1900 floor, Feb 29 handling) for UX only. The server decides eligibility at registration.
 - The DOB is held in memory only (`registrationDraft`) until registration. It is never persisted, logged or sent to analytics. An under-age result clears it and replaces the route, so Back cannot return to a filled form.
 - Mobile analytics events (`welcome_viewed`, `age_gate_completed {eligible}`, …) are **not emitted yet**: no mobile `AnalyticsProvider` exists. They are deferred to the analytics slice.
+
+---
+
+## B4.1 — Location (O03): manual city selection
+
+**APPROVED 2026-10-05** by the project owner. Migration `0001_location_foundation` (metros, cities, user_locations + reviewed seed).
+
+### B4.1-D1 — Initial DFW city taxonomy
+
+PRD §19 names Frisco, Plano, Irving and Dallas as **illustrative** public-location examples; it is not an exhaustive list. The owner-approved initial taxonomy for B4.1 is these 14 DFW localities:
+
+> Dallas, Fort Worth, Arlington, Frisco, Plano, Irving, McKinney, Allen, Richardson, Carrollton, Coppell, Prosper, Denton, Lewisville
+
+All are `metro = DFW`, `state_region = TX`, `country_code = US`, `launch_status = ACTIVE`. The DFW metro is `Dallas–Fort Worth`, `US`, `America/Chicago`, `ACTIVE`. This is seed data only; DFW is never encoded in constraints or application invariants (DATA-MODEL §126). Further cities require owner approval and a separate reviewed data migration. This is not a national city database.
+
+### B4.1-D2 — Manual city only; explicit divergence from SFS O03
+
+**Deliberate narrowing of SFS O03.** SFS O03 shows "Use My Location" as the primary action with manual choice as the secondary one. B4.1 implements **manual city selection only**:
+
+- no GPS, no OS location-permission prompt, no map, no neighborhood field, no geocoding or external location provider, no IP inference;
+- `user_locations.precision_type = MANUAL_CITY`, `source = MANUAL` (the CHECK constraints allow only these values in this slice).
+
+BR-LOC-003 (GPS optional; manual choice must allow product use) is satisfied. Device location returns as an approved, contextual permission flow when discovery distance needs it.
+
+### B4.1-D3 — Location write ordering
+
+Location is never collected early (data minimisation, predictable ordering):
+
+| Onboarding step at write time | `PATCH /api/v1/users/me/location` |
+|---|---|
+| before LOCATION (NAME, GENDER) | rejected `409 ONBOARDING_STEP_NOT_REACHED`; nothing stored |
+| LOCATION | saved; LOCATION → INTENT in the same transaction |
+| INTENT or later, including COMPLETE | saved (city edit); onboarding never rewinds |
+
+The location module writes `user_locations`; identity alone writes `users.onboarding_*` via `OnboardingProgressService`, inside one UnitOfWork transaction that row-locks the user (same pattern as B2-D1). `onboarding_step_completed {step_code: LOCATION}` is emitted after commit only, once; the city never enters analytics.
+
+### B4.1-D4 — Users outside the approved cities
+
+For invite-only Cohort 1, only approved DFW cities can complete Location. The screen says "Can't find your city? We're starting in Dallas–Fort Worth and expanding soon." There is no fake city, no "Other" value, no free-text city, no IP inference and no waitlist table. Such users cannot advance and no location data is stored. A real expansion/waitlist workflow (BR-LOC-006) is a later, separately approved slice.
+
+### B4.1-D5 — Schema departures from DATA-MODEL §21–23
+
+| Departure | Resolution |
+|---|---|
+| No `active` boolean on metros/cities | `launch_status` (ACTIVE/WAITLIST/FUTURE/DISABLED) is the single availability source; a second flag could disagree. |
+| No city centroid coordinates | Added by additive migration with a concrete discovery-distance implementation. |
+| `country_code varchar(2)` + `^[A-Z]{2}$` CHECK | Instead of padded `CHAR(2)`. |
+| No `latitude`/`longitude` on `user_locations` | B4.1 collects none. Coordinates (and a geography point, if justified) arrive with GPS through a reviewed additive migration. |
+| No `(metro_id, city_id)` or spatial index | Added with discovery queries and their plans. |
+
+**Integrity:** composite foreign keys make a mismatched metro or country unrepresentable: `user_locations (city_id, metro_id, country_code) → cities (id, metro_id, country_code)` and `cities (metro_id, country_code) → metros (id, country_code)`. `user_locations.user_id` is the primary key: one current row per user, overwritten in place, never a history (ADR-057, DATA-MODEL §87).
+
+### B4.1-D6 — API
+
+- `GET /api/v1/locations/cities` (authenticated): ACTIVE cities in ACTIVE metros, by name, as `{ id, name, stateRegion, countryCode, metro: { id, code, name }, launchStatus }`. No coordinates, timezone or neighborhood. The list is a small bounded taxonomy, so it is returned whole (not cursor-paginated) and the client filters locally; it is not a people or geocoding search (ADR-045).
+- `PATCH /api/v1/users/me/location` accepts exactly `{ cityId }`; metro, country, precision and source are server-derived and any other field is `400 VALIDATION_FAILED`. Unknown and non-selectable cities are both `422 CITY_NOT_AVAILABLE`. Allowed for ACTIVE and PENDING_VERIFICATION accounts (guard default). Re-sending the same city is naturally idempotent (state-setting overwrite), so no Idempotency-Key is required.
+- Response: `{ location: { city }, onboarding: { status, step } }`. `GET /users/me` does not yet include the location; the Location screen does not pre-select a previously saved city.
+
+### B4.1-D7 — Holding screen
+
+The B3 "Great start." holding screen now sits at **INTENT** (after Location) until B4.2, with copy updated to "Your basics and city are saved." Copy is provisional pending visual review.
+
+### B4.1-D8 — Review follow-ups
+
+- **Account status re-checked under the user row lock.** `OnboardingProgressService.lockForProfileUpdate` now fails closed (`403 ACCOUNT_NOT_ACTIVE`) unless the locked account is ACTIVE or PENDING_VERIFICATION. A restriction that commits after request authentication therefore still blocks the write. This tightens the existing B2 profile write path as well as the new location path.
+- **Deletion (open, not in B4.1).** `user_locations.user_id → users` is `ON DELETE NO ACTION`. The future deletion orchestrator (ADR-056) must purge `user_locations` explicitly; record this when that slice is designed.
+- **Save-failure handling (found in device validation).** A failed location save no longer waits on, or replaces, the loaded city list. The list is refreshed in the background only on `CITY_NOT_AVAILABLE`. A failed background refetch keeps the last good list (and selection) visible; the load-error state with "Try again" appears only when no list has ever loaded.
+
+### B4.1 — Android validation (2026-10-05)
+
+**COMPLETE.** Pixel 9 Pro XL emulator, Expo Go, local API:
+
+1. Resuming an account parked at LOCATION opens Location directly.
+2. While searching, the selected city stays visible and checked.
+3. Choosing a city advances to the INTENT holding screen; the stored row is `MANUAL_CITY` / `MANUAL` / DFW.
+4. Back and a cold relaunch stay at INTENT (no regression).
+5. A no-match search shows "No matching cities." and dispatches a `TYPE_ANNOUNCEMENT` accessibility event.
+6. Load-error and "Try again" states render and recover once the API returns; a withdrawn city returns `CITY_NOT_AVAILABLE`, refreshes the list and clears the selection.
+7. At font scale 2.0, the heading, city rows, notes, privacy caption, Continue and the holding screen are unclipped.
+8. TalkBack semantics: labelled search field; city rows expose the radio role with checked state; buttons expose enabled/busy state. Spoken output was not audibly verified (adb cannot drive TalkBack gestures); a hands-on TalkBack pass remains advisable before release. iOS VoiceOver: pending (no macOS device).

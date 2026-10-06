@@ -3,10 +3,10 @@ import { createClient, type RedisClientType } from 'redis';
 
 import type { Database } from '../../src/shared/database/database.module.js';
 
-/** Clears transactional tables; reference data (gender_options) is kept. */
+/** Clears transactional tables; reference data (gender_options, metros, cities) is kept. */
 export async function resetDatabase(db: Database): Promise<void> {
   await db.execute(
-    sql`TRUNCATE audit_events, user_profiles, user_sessions, users RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE audit_events, user_locations, user_profiles, user_sessions, users RESTART IDENTITY CASCADE`,
   );
 }
 

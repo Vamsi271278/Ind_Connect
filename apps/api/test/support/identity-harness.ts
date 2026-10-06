@@ -22,10 +22,12 @@ import { JoseAccessTokenService } from '../../src/modules/identity/infrastructur
 import { BootstrapService } from '../../src/modules/configuration/application/bootstrap.service.js';
 import { OnboardingProgressService } from '../../src/modules/identity/application/onboarding-progress.service.js';
 import { SelfAccountQuery } from '../../src/modules/identity/application/self-account.query.js';
+import { LocationService } from '../../src/modules/location/application/location.service.js';
 import { ProfileService } from '../../src/modules/profile/application/profile.service.js';
 import { AnalyticsTracker } from '../../src/shared/analytics/analytics.js';
 import { KeyedHasher } from '../../src/shared/crypto/crypto.js';
 import { InMemoryAnalyticsProvider } from './in-memory-analytics.js';
+import { InMemoryLocationStore } from './in-memory-location.js';
 import { InMemoryProfileStore, InMemoryUnitOfWork } from './in-memory-profile.js';
 import { InMemoryEphemeralStore } from './in-memory-ephemeral-store.js';
 import { InMemoryIdentityStore } from './in-memory-identity-store.js';
@@ -146,7 +148,8 @@ export function createIdentityHarness(
   );
 
   const profiles = new InMemoryProfileStore();
-  const unitOfWork = new InMemoryUnitOfWork(store, profiles);
+  const locations = new InMemoryLocationStore();
+  const unitOfWork = new InMemoryUnitOfWork(store, profiles, locations);
   const onboarding = new OnboardingProgressService(store, clock);
   const selfAccount = new SelfAccountQuery(store, clock);
   const profileService = new ProfileService({
@@ -154,6 +157,13 @@ export function createIdentityHarness(
     profiles,
     onboarding,
     selfAccount,
+    analytics,
+    clock,
+  });
+  const locationService = new LocationService({
+    unitOfWork,
+    locations,
+    onboarding,
     analytics,
     clock,
   });
@@ -195,6 +205,8 @@ export function createIdentityHarness(
     onboarding,
     selfAccount,
     profileService,
+    locations,
+    locationService,
     bootstrap,
     clock,
     ephemeral,

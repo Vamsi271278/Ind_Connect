@@ -26,6 +26,9 @@ export const ERROR_CODES = [
   'OTP_ATTEMPTS_EXCEEDED',
   'REGISTRATION_TOKEN_INVALID',
   'AGE_NOT_ELIGIBLE',
+  // Onboarding / location
+  'ONBOARDING_STEP_NOT_REACHED',
+  'CITY_NOT_AVAILABLE',
   // Throttling / availability
   'RATE_LIMITED',
   'OTP_UNAVAILABLE',

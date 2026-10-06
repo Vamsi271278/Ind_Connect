@@ -89,6 +89,11 @@ export interface OnboardingState {
   readonly step: OnboardingStep;
 }
 
+/** Onboarding state read under the user row lock, with the account status. */
+export interface LockedOnboarding extends OnboardingState {
+  readonly accountStatus: AccountStatus;
+}
+
 export interface AuditEntry {
   readonly actorType: 'USER' | 'SYSTEM';
   readonly actorId: string | null;
@@ -135,7 +140,7 @@ export interface IdentityRepository {
 
   findSelfAccountFacts(userId: string): Promise<SelfAccountFacts | undefined>;
   /** Row-locks the user (FOR UPDATE): serializes profile/onboarding writes per user. */
-  lockOnboarding(userId: string): Promise<OnboardingState | undefined>;
+  lockOnboarding(userId: string): Promise<LockedOnboarding | undefined>;
   updateOnboarding(userId: string, state: OnboardingState, at: Date): Promise<void>;
 }
 

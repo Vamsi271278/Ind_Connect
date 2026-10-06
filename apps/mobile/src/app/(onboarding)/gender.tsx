@@ -62,7 +62,7 @@ export default function GenderScreen() {
       parsedDescription?.success === true
         ? { genderCode: code, genderSelfDescription: parsedDescription.data }
         : { genderCode: code };
-    if (await save(body)) router.replace('/setup-continue');
+    if (await save(body)) router.push('/location');
   };
 
   return (

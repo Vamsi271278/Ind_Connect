@@ -17,6 +17,8 @@ export const queryKeys = {
   bootstrap: (sessionKind: string) => ['bootstrap', sessionKind] as const,
   user: ['user'] as const,
   me: ['user', 'me'] as const,
+  /** Selectable launch cities: reference data, not account data. */
+  cities: ['locations', 'cities'] as const,
 };
 
 export const getInstallId = createInstallIdProvider(secureStore, generateInstallId);

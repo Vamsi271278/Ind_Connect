@@ -58,6 +58,13 @@ export function describeAuthFailure(error: unknown): AuthFailure {
       };
     case 'OTP_UNAVAILABLE':
       return { kind: 'banner', message: "We couldn't send your code right now. Please try again." };
+    case 'CITY_NOT_AVAILABLE':
+      return {
+        kind: 'banner',
+        message: "That city isn't available right now. Please choose another.",
+      };
+    case 'ONBOARDING_STEP_NOT_REACHED':
+      return { kind: 'banner', message: 'Please finish the earlier steps first.' };
     default:
       return {
         kind: 'banner',

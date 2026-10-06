@@ -7,9 +7,10 @@ import { useAppState } from '@/app-shell/session-provider';
 import { ConnectionArtwork } from '@/features/onboarding/ConnectionArtwork';
 
 /**
- * Onboarding continuation — a TEMPORARY holding screen until the Location
- * slice exists (B3-V1). It does not pretend Location is implemented; once it
- * is, users go straight from Gender to Location and this screen is removed.
+ * Onboarding continuation — a TEMPORARY holding screen at INTENT until the
+ * B4.2 slice (Intent, Languages, Interests) exists. It does not pretend those
+ * steps are implemented; once they are, Location leads straight to Intent and
+ * this screen is removed.
  */
 export default function SetupContinueScreen() {
   const { signOut } = useAppState();
@@ -39,15 +40,15 @@ export default function SetupContinueScreen() {
       <View style={styles.copy}>
         <AppText variant="h1">Great start.</AppText>
         <AppText variant="bodyLarge" style={styles.strong}>
-          Your profile basics are saved.
+          Your basics and city are saved.
         </AppText>
         <AppText tone="secondary">
-          Next, we’ll use your city to help you find relevant people, activities and events nearby.
+          Next, you’ll choose what you’re here for, the languages you speak and your interests.
         </AppText>
         {holding && (
           <InlineMessage
             tone="info"
-            message="Location setup isn’t available in this build yet. Your progress is saved."
+            message="The next steps aren’t available in this build yet. Your progress is saved."
           />
         )}
       </View>
