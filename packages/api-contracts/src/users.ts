@@ -8,6 +8,7 @@ import {
 } from './enums.js';
 import { topLevelIntentCodeSchema } from './intents.js';
 import { citySchema } from './locations.js';
+import { languageSchema, selectedInterestSchema } from './taxonomy.js';
 import { firstNameSchema, genderSelfDescriptionSchema } from './profile.js';
 
 // ---------------------------------------------------------------- PATCH /users/me/profile
@@ -71,6 +72,8 @@ export const selfUserSchema = z.strictObject({
   location: z.strictObject({ city: citySchema }).nullable(),
   activeIntents: z.array(topLevelIntentCodeSchema),
   datingEnabled: z.boolean(),
+  languages: z.array(languageSchema),
+  interests: z.array(selectedInterestSchema),
 });
 export type SelfUser = z.infer<typeof selfUserSchema>;
 

@@ -14,7 +14,9 @@ import {
   type ProfileState,
 } from '../domain/profile.js';
 import { DATING_INTENT, type TopLevelIntentCode } from '../domain/intents.js';
+import type { Language, SelectedInterest } from '../domain/taxonomy.js';
 import type { IntentStore } from './intent-ports.js';
+import type { TaxonomyStore } from './taxonomy-ports.js';
 import type { ProfileStore } from './ports.js';
 
 /** SelfUserDto content (AUTHORIZATION §XLI); shaped by the contract at the edge. */
@@ -36,6 +38,9 @@ export interface SelfUserView {
    * consent. Self projection only; consent details are never exposed.
    */
   readonly datingEnabled: boolean;
+  /** Saved O06/O07 choices (codes + labels), self-only. */
+  readonly languages: readonly Language[];
+  readonly interests: readonly SelectedInterest[];
 }
 
 /** The saved city as the self projection needs it (city/metro context only). */
@@ -60,6 +65,7 @@ export interface ProfileServiceDependencies {
   readonly selfAccount: SelfAccountQuery;
   readonly locations: MyCityReader;
   readonly intents: IntentStore;
+  readonly taxonomy: TaxonomyStore;
   readonly analytics: AnalyticsTracker;
   readonly clock: Clock;
 }
@@ -68,11 +74,13 @@ export class ProfileService {
   constructor(private readonly deps: ProfileServiceDependencies) {}
 
   async getMe(userId: string): Promise<SelfUserView> {
-    const [account, profile, city, activeIntents] = await Promise.all([
+    const [account, profile, city, activeIntents, languages, interests] = await Promise.all([
       this.deps.selfAccount.getSelfAccount(userId),
       this.deps.profiles.repository.findProfile(userId),
       this.deps.locations.findMyCity(userId),
       this.deps.intents.repository.listActiveIntents(userId),
+      this.deps.taxonomy.repository.listUserLanguages(userId),
+      this.deps.taxonomy.repository.listUserInterests(userId),
     ]);
     return {
       id: account.id,
@@ -84,6 +92,8 @@ export class ProfileService {
       location: city === undefined ? null : { city },
       activeIntents,
       datingEnabled: activeIntents.includes(DATING_INTENT),
+      languages,
+      interests,
     };
   }
 

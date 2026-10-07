@@ -5,11 +5,13 @@ import { ONBOARDING_STEPS } from './account.js';
 import {
   hasReachedIntentStep,
   hasReachedLocationStep,
+  hasReachedStep,
   isGenderComplete,
   isNameComplete,
   nextOnboardingState,
   nextOnboardingStateAfterIntents,
   nextOnboardingStateAfterLocation,
+  nextOnboardingStateAfterStep,
   type OnboardingProfileFacts,
 } from './onboarding-progress.js';
 
@@ -134,6 +136,41 @@ describe('intent step rule (B4.2A)', () => {
   it('never rewinds or skips after INTENT', () => {
     for (const step of ['COMPLETE'] as const) {
       expect(nextOnboardingStateAfterIntents(at(step), 0)).toMatchObject({
+        step,
+        completedSteps: [],
+      });
+    }
+  });
+});
+
+describe('generic step rule (LANGUAGE, INTERESTS)', () => {
+  const state = (step: 'INTENT' | 'LANGUAGE' | 'INTERESTS' | 'PHOTO' | 'COMPLETE') =>
+    ({ status: step === 'COMPLETE' ? 'COMPLETE' : 'IN_PROGRESS', step }) as const;
+
+  it('requires the step to have been reached', () => {
+    expect(hasReachedStep('INTENT', 'LANGUAGE')).toBe(false);
+    expect(hasReachedStep('LANGUAGE', 'LANGUAGE')).toBe(true);
+    expect(hasReachedStep('COMPLETE', 'INTERESTS')).toBe(true);
+  });
+
+  it('advances LANGUAGE → INTERESTS → PHOTO only when complete', () => {
+    expect(nextOnboardingStateAfterStep(state('LANGUAGE'), 'LANGUAGE', true)).toMatchObject({
+      step: 'INTERESTS',
+      completedSteps: ['LANGUAGE'],
+    });
+    expect(nextOnboardingStateAfterStep(state('INTERESTS'), 'INTERESTS', true)).toMatchObject({
+      step: 'PHOTO',
+      completedSteps: ['INTERESTS'],
+    });
+    expect(nextOnboardingStateAfterStep(state('LANGUAGE'), 'LANGUAGE', false)).toMatchObject({
+      step: 'LANGUAGE',
+      completedSteps: [],
+    });
+  });
+
+  it('is inert at any other step (never rewinds or skips)', () => {
+    for (const step of ['INTERESTS', 'PHOTO', 'COMPLETE'] as const) {
+      expect(nextOnboardingStateAfterStep(state(step), 'LANGUAGE', true)).toMatchObject({
         step,
         completedSteps: [],
       });

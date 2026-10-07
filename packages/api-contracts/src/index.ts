@@ -13,4 +13,5 @@ export * from './locations.js';
 export * from './openapi.js';
 export * from './phone.js';
 export * from './profile.js';
+export * from './taxonomy.js';
 export * from './users.js';

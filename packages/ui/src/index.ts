@@ -19,6 +19,7 @@ export { LoadingIndicator, type LoadingIndicatorProps } from './LoadingIndicator
 export { OtpInput, type OtpInputHandle, type OtpInputProps } from './OtpInput.js';
 export { PhoneField, type PhoneFieldProps } from './PhoneField.js';
 export { Screen, type ScreenProps } from './Screen.js';
+export { SelectableChip, type SelectableChipProps } from './SelectableChip.js';
 export { SelectionRow, type SelectionRowProps } from './SelectionRow.js';
 export { TextField, type TextFieldProps } from './TextField.js';
 export { type Theme, useTheme } from './theme.js';

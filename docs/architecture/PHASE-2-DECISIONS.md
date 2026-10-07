@@ -295,3 +295,37 @@ Every write except withdrawal re-checks account status under the user row lock (
   2. Turning the kill switch off does **not** revoke existing opt-ins. Every future dating surface (discovery, connection reasons, dating events) must require `DATING_ENABLED` **and** the user's dating state, with an acceptance test that switch-off plus an existing consent yields zero dating exposure. Whether switch-off should also suspend existing participation is a product/safety decision to confirm then.
   3. The `USE_DATING` capability restriction must be enforced on opt-in once `user_restrictions` exists.
   4. While the switch is off, an active DATING still counts toward the one-intent minimum; revisit with onboarding completion.
+
+### B4.2A — Status
+
+**COMPLETE** (owner sign-off 2026-10-06). Commit `fe70faa`. Migration `0002_intent_dating_foundation`.
+
+Done: schema/migration, intent API, explicit Dating consent API, server kill switch, self projection, Intent and Dating opt-in screens, concurrency/invariant tests, security/T&S/accessibility review, Android runtime validation, OpenAPI/check/unit/integration/e2e green.
+
+Deferred, and **release blockers** before `DATING_ENABLED=true` in any real environment (not technical debt): the real dating legal policy and its link on O05, downstream kill-switch enforcement in every dating surface, and the `USE_DATING` restriction. Also deferred: dating preferences and sub-intents UI, dating discovery, an iOS VoiceOver pass and a hands-on TalkBack speech check.
+
+---
+
+## B4.2B — Languages + Interests (O06/O07)
+
+**APPROVED 2026-10-06** by the project owner. Migration `0003_languages_interests_foundation` (languages, user_languages, interest_categories, interests, user_interests + reviewed seed).
+
+### B4.2B-D1 — Taxonomy
+
+- **Languages (12):** the PRD §17 / SFS O06 set, in **SFS display order** (screen behaviour is SFS-governed): English, Telugu, Tamil, Kannada, Hindi, Malayalam, Gujarati, Punjabi, Bengali, Marathi, Urdu, Odia. Codes are ISO 639-1 (`en te ta kn hi ml gu pa bn mr ur or`).
+- **Interests:** the 6 DATA-MODEL §15 / PRD §18 categories and exactly the 38 PRD §18 interests with stable UPPER_SNAKE codes. Presentation-only label cleanups (codes unchanged): **Gym & fitness**, **Temples & cultural events**, **Stand-up comedy**. These labels appear only in PRD §18; SFS O07 defers to the PRD taxonomy.
+- Deferred (additive later, no guessed data): `languages.native_name`, `interests.icon_key`, language proficiency. No discovery indexes and no selection history.
+
+### B4.2B-D2 — API and rules
+
+- `GET /api/v1/profile/languages`, `GET /api/v1/profile/interests` (categories with interests), by **code**; internal interest UUIDs never leave the server.
+- `PUT /api/v1/users/me/languages` `{ languages: [codes] }` and `PUT /api/v1/users/me/interests` `{ interests: [codes] }`: full-set replace. **Atomic:** any unknown or inactive code fails the whole save (`400 VALIDATION_FAILED`, issue `language_not_available` / `interest_not_available`) and the previous selection is unchanged.
+- **At least 1 language and at least 3 interests on every save**, including later edits. There is no business maximum (the contracts carry only payload bounds). Unlike Dating withdrawal there is no user-control exception, so the client cannot create an invalid profile.
+- Progression uses a generic identity step rule (`assertStepReached` / `recordStepProgress`): rejected before the step (`409 ONBOARDING_STEP_NOT_REACHED`); LANGUAGE → INTERESTS and INTERESTS → PHOTO in the save transaction, under the user lock with the account re-check; later edits never rewind. `onboarding_step_completed` after commit only. `interest_selected` / `onboarding_interest_count` (SFS) are not registry events and are not emitted.
+- `/users/me` adds `languages: [{ code, displayName }]` and `interests: [{ code, label, categoryCode }]` (self-only, restores O06/O07 selection).
+
+### B4.2B-D3 — Screens
+
+- O06: "Which languages do you speak? / Choose all that apply." Searchable list of `CheckboxRow`s; English first.
+- O07: category sections of the new shared **`SelectableChip`** (checkbox role and checked state, ≥44pt target, grows with text, selected shown by border, tint, weight and a view-drawn check, never colour alone; the `action.primary on surface.selected` pair is already contrast-tested). A live "N selected · choose N more" counter sits by Continue, which is disabled below 3. The O07 heading copy ("What are you into?") is provisional pending visual review.
+- The holding screen now sits at PHOTO ("Next, you'll add a profile photo.").

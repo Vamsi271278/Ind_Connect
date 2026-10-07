@@ -19,8 +19,12 @@ export default function ResumeOnboarding() {
       return <Redirect href="/location" />;
     case 'INTENT':
       return <Redirect href="/intent" />;
+    case 'LANGUAGE':
+      return <Redirect href="/languages" />;
+    case 'INTERESTS':
+      return <Redirect href="/interests" />;
     default:
-      // LANGUAGE and later: the holding screen until B4.2B builds those steps.
+      // PHOTO and later: the holding screen until the Photo slice exists.
       return <Redirect href="/setup-continue" />;
   }
 }

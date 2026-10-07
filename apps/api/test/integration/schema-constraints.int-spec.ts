@@ -21,6 +21,11 @@ const {
   intentOptions,
   userIntents,
   datingConsents,
+  languages,
+  userLanguages,
+  interestCategories,
+  interests,
+  userInterests,
 } = schema;
 
 let pool: pg.Pool;
@@ -581,5 +586,99 @@ describe('intent_options / user_intents / dating_consents', () => {
           .values(consent(user.id, { revokedAt: new Date('2026-10-06T11:00:00Z') })),
       ),
     ).toBe('23514');
+  });
+});
+
+describe('languages / interests taxonomy', () => {
+  const newUser = async (phone: string) => {
+    const [row] = await db
+      .insert(users)
+      .values(userValues({ phoneE164: phone, onboardingStep: 'LANGUAGE' }))
+      .returning();
+    if (row === undefined) throw new Error('user insert failed');
+    return row;
+  };
+  const interestId = async (code: string) => {
+    const [row] = await db
+      .select({ id: interests.id })
+      .from(interests)
+      .where(eq(interests.code, code));
+    if (row === undefined) throw new Error(`no interest ${code}`);
+    return row.id;
+  };
+
+  it('seeds 12 languages, 6 categories and 38 interests, all active', async () => {
+    const langs = await db.select().from(languages);
+    const categories = await db.select().from(interestCategories);
+    const all = await db.select().from(interests);
+    expect([langs.length, categories.length, all.length]).toEqual([12, 6, 38]);
+    expect([...langs, ...categories, ...all].every((r) => r.active)).toBe(true);
+    expect(new Set(all.map((i) => i.code)).size).toBe(38);
+  });
+
+  it('allows each language and interest once per user, and only known ones', async () => {
+    const user = await newUser('+12145550901');
+    await db.insert(userLanguages).values({ userId: user.id, languageCode: 'en' });
+    expect(
+      await sqlState(db.insert(userLanguages).values({ userId: user.id, languageCode: 'en' })),
+    ).toBe('23505');
+    expect(
+      await sqlState(db.insert(userLanguages).values({ userId: user.id, languageCode: 'xx' })),
+    ).toBe('23503');
+
+    const cricket = await interestId('CRICKET');
+    await db.insert(userInterests).values({ userId: user.id, interestId: cricket });
+    expect(
+      await sqlState(db.insert(userInterests).values({ userId: user.id, interestId: cricket })),
+    ).toBe('23505');
+    expect(
+      await sqlState(
+        db
+          .insert(userInterests)
+          .values({ userId: user.id, interestId: '00000000-0000-4000-8000-000000000000' }),
+      ),
+    ).toBe('23503');
+  });
+
+  it('enforces reference-data codes, uniqueness and categories', async () => {
+    expect(
+      await sqlState(
+        db.insert(languages).values({ code: 'English', displayName: 'X', displayOrder: 99 }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(languages).values({ code: 'en', displayName: 'X', displayOrder: 99 }),
+      ),
+    ).toBe('23505');
+    const [sports] = await db
+      .select()
+      .from(interestCategories)
+      .where(eq(interestCategories.code, 'SPORTS'));
+    if (sports === undefined) throw new Error('no SPORTS');
+    expect(
+      await sqlState(
+        db
+          .insert(interests)
+          .values({ code: 'CRICKET', label: 'X', categoryId: sports.id, displayOrder: 99 }),
+      ),
+    ).toBe('23505');
+    expect(
+      await sqlState(
+        db
+          .insert(interests)
+          .values({ code: 'chess', label: 'Chess', categoryId: sports.id, displayOrder: 99 }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(interests).values({
+          code: 'CHESS',
+          label: 'Chess',
+          categoryId: '00000000-0000-4000-8000-000000000000',
+          displayOrder: 99,
+        }),
+      ),
+    ).toBe('23503');
   });
 });

@@ -52,6 +52,8 @@ describe('selfUserSchema', () => {
     location: null,
     activeIntents: [],
     datingEnabled: false,
+    languages: [],
+    interests: [],
   };
 
   it('accepts the self projection and refuses any extra private field', () => {

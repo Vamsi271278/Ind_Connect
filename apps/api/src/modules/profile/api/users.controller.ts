@@ -42,6 +42,12 @@ const toDto = (view: SelfUserView): SelfUser =>
           },
     activeIntents: [...view.activeIntents],
     datingEnabled: view.datingEnabled,
+    languages: view.languages.map((l) => ({ code: l.code, displayName: l.displayName })),
+    interests: view.interests.map((i) => ({
+      code: i.code,
+      label: i.label,
+      categoryCode: i.categoryCode,
+    })),
   });
 
 /**

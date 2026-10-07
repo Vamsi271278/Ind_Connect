@@ -19,6 +19,8 @@ const me = {
   location: null,
   activeIntents: [],
   datingEnabled: false,
+  languages: [],
+  interests: [],
 };
 
 /**

@@ -1,4 +1,9 @@
-import { ONBOARDING_STEPS, type OnboardingStatus, type OnboardingStep } from './account.js';
+import {
+  nextOnboardingStep,
+  ONBOARDING_STEPS,
+  type OnboardingStatus,
+  type OnboardingStep,
+} from './account.js';
 
 /**
  * Profile facts relevant to onboarding completion. Supplied by the profile
@@ -99,4 +104,24 @@ export function nextOnboardingStateAfterIntents(
     return { status: current.status, step: current.step, completedSteps: [] };
   }
   return { status: current.status, step: 'LANGUAGE', completedSteps: [INTENT_STEP] };
+}
+
+/** Data for `step` is never collected before onboarding reaches it (B4.1-D3 pattern). */
+export const hasReachedStep = (current: OnboardingStep, step: OnboardingStep): boolean =>
+  indexOf(current) >= indexOf(step);
+
+/**
+ * Generic single-step rule (LANGUAGE, INTERESTS): when the user is exactly at
+ * `step` and its data is complete, advance to the next canonical step. At any
+ * other step it is inert, so later edits never rewind or skip onboarding.
+ */
+export function nextOnboardingStateAfterStep(
+  current: { readonly status: OnboardingStatus; readonly step: OnboardingStep },
+  step: OnboardingStep,
+  complete: boolean,
+): OnboardingTransition {
+  if (current.step !== step || !complete) {
+    return { status: current.status, step: current.step, completedSteps: [] };
+  }
+  return { status: current.status, step: nextOnboardingStep(step), completedSteps: [step] };
 }

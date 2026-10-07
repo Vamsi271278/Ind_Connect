@@ -61,7 +61,7 @@ export default function IntentScreen() {
 
   const onContinue = async () => {
     if (!canContinue(selection, datingEnabled)) return;
-    if (await intents.save([...selection])) router.replace('/setup-continue');
+    if (await intents.save([...selection])) router.push('/languages');
   };
 
   return (

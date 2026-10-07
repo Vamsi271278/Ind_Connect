@@ -4,9 +4,11 @@ import { canUseSelfService, type OnboardingStep } from '../domain/account.js';
 import {
   hasReachedIntentStep,
   hasReachedLocationStep,
+  hasReachedStep,
   nextOnboardingState,
   nextOnboardingStateAfterIntents,
   nextOnboardingStateAfterLocation,
+  nextOnboardingStateAfterStep,
   type OnboardingProfileFacts,
 } from '../domain/onboarding-progress.js';
 import type { Clock, IdentityStore, OnboardingState } from './ports.js';
@@ -65,6 +67,35 @@ export class OnboardingProgressService {
   }> {
     this.assertIntentAllowed(current);
     const next = nextOnboardingStateAfterIntents(current, activeIntentCount);
+    if (next.step !== current.step || next.status !== current.status) {
+      await this.store
+        .forTransaction(tx)
+        .updateOnboarding(userId, { status: next.status, step: next.step }, this.clock.now());
+    }
+    return next;
+  }
+
+  /** Fails closed unless onboarding has reached `step` (LANGUAGE, INTERESTS). */
+  assertStepReached(current: OnboardingState, step: OnboardingStep): void {
+    if (!hasReachedStep(current.step, step)) {
+      throw new ApplicationError('ONBOARDING_STEP_NOT_REACHED');
+    }
+  }
+
+  /** After a save for `step`: advance it when complete; later edits never rewind. */
+  async recordStepProgress(
+    tx: TransactionContext,
+    userId: string,
+    current: OnboardingState,
+    step: OnboardingStep,
+    complete: boolean,
+  ): Promise<{
+    readonly status: OnboardingState['status'];
+    readonly step: OnboardingStep;
+    readonly completedSteps: readonly OnboardingStep[];
+  }> {
+    this.assertStepReached(current, step);
+    const next = nextOnboardingStateAfterStep(current, step, complete);
     if (next.step !== current.step || next.status !== current.status) {
       await this.store
         .forTransaction(tx)

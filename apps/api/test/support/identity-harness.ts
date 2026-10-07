@@ -31,12 +31,14 @@ import {
   IntentService,
 } from '../../src/modules/profile/application/intent.service.js';
 import { ProfileService } from '../../src/modules/profile/application/profile.service.js';
+import { TaxonomyService } from '../../src/modules/profile/application/taxonomy.service.js';
 import { AnalyticsTracker } from '../../src/shared/analytics/analytics.js';
 import { KeyedHasher } from '../../src/shared/crypto/crypto.js';
 import { InMemoryAnalyticsProvider } from './in-memory-analytics.js';
 import { InMemoryDatingConsentStore, InMemoryIntentStore } from './in-memory-intents.js';
 import { InMemoryLocationStore } from './in-memory-location.js';
 import { InMemoryProfileStore, InMemoryUnitOfWork } from './in-memory-profile.js';
+import { InMemoryTaxonomyStore } from './in-memory-taxonomy.js';
 import { InMemoryEphemeralStore } from './in-memory-ephemeral-store.js';
 import { InMemoryIdentityStore } from './in-memory-identity-store.js';
 import { ManualClock } from './manual-clock.js';
@@ -160,7 +162,14 @@ export function createIdentityHarness(
   const locations = new InMemoryLocationStore();
   const intents = new InMemoryIntentStore();
   const consents = new InMemoryDatingConsentStore();
-  const unitOfWork = new InMemoryUnitOfWork(store, [profiles, locations, intents, consents]);
+  const taxonomy = new InMemoryTaxonomyStore();
+  const unitOfWork = new InMemoryUnitOfWork(store, [
+    profiles,
+    locations,
+    intents,
+    consents,
+    taxonomy,
+  ]);
   // Dating defaults to ON in the harness so its behavior is testable; the
   // kill-switch tests pass { enabled: false } explicitly.
   const dating: DatingAvailability = options.dating ?? {
@@ -176,6 +185,14 @@ export function createIdentityHarness(
     selfAccount,
     locations: new LocationQuery(locations),
     intents,
+    taxonomy,
+    analytics,
+    clock,
+  });
+  const taxonomyService = new TaxonomyService({
+    unitOfWork,
+    taxonomy,
+    onboarding,
     analytics,
     clock,
   });
@@ -247,6 +264,8 @@ export function createIdentityHarness(
     consents,
     intentService,
     datingConsentService,
+    taxonomy,
+    taxonomyService,
     bootstrap,
     clock,
     ephemeral,

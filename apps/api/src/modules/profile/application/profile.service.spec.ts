@@ -39,6 +39,8 @@ describe('ProfileService', () => {
       location: null,
       activeIntents: [],
       datingEnabled: false,
+      languages: [],
+      interests: [],
     });
     const text = JSON.stringify(me);
     expect(text).not.toContain('1995-06-15');

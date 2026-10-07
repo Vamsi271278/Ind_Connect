@@ -9,7 +9,15 @@ import {
   errorEnvelopeSchema,
   IDEMPOTENCY_KEY_HEADER,
   type IntentOptionsResponse,
+  type InterestCatalogResponse,
+  interestCatalogResponseSchema,
   intentOptionsResponseSchema,
+  type LanguageListResponse,
+  languageListResponseSchema,
+  type MyInterestsResponse,
+  myInterestsResponseSchema,
+  type MyLanguagesResponse,
+  myLanguagesResponseSchema,
   type MyIntentsResponse,
   myIntentsResponseSchema,
   type MyLocationResponse,
@@ -308,6 +316,46 @@ export class ApiClient {
     return this.requestNoContent({
       method: 'DELETE',
       path: '/api/v1/users/me/dating/consent',
+      auth: 'required',
+    });
+  }
+
+  listLanguages(): Promise<LanguageListResponse> {
+    return this.request({
+      method: 'GET',
+      path: '/api/v1/profile/languages',
+      schema: languageListResponseSchema,
+      auth: 'required',
+    });
+  }
+
+  listInterests(): Promise<InterestCatalogResponse> {
+    return this.request({
+      method: 'GET',
+      path: '/api/v1/profile/interests',
+      schema: interestCatalogResponseSchema,
+      auth: 'required',
+    });
+  }
+
+  /** Full-set replace by ISO code (at least one). */
+  updateMyLanguages(languages: readonly string[]): Promise<MyLanguagesResponse> {
+    return this.request({
+      method: 'PUT',
+      path: '/api/v1/users/me/languages',
+      body: { languages: [...languages] },
+      schema: myLanguagesResponseSchema,
+      auth: 'required',
+    });
+  }
+
+  /** Full-set replace by stable interest code (at least three). */
+  updateMyInterests(interests: readonly string[]): Promise<MyInterestsResponse> {
+    return this.request({
+      method: 'PUT',
+      path: '/api/v1/users/me/interests',
+      body: { interests: [...interests] },
+      schema: myInterestsResponseSchema,
       auth: 'required',
     });
   }

@@ -7,10 +7,9 @@ import { useAppState } from '@/app-shell/session-provider';
 import { ConnectionArtwork } from '@/features/onboarding/ConnectionArtwork';
 
 /**
- * Onboarding continuation — a TEMPORARY holding screen at LANGUAGE until the
- * B4.2B slice (Languages, Interests) exists. It does not pretend those steps
- * are implemented; once they are, Intent leads straight to Languages and this
- * screen is removed.
+ * Onboarding continuation — a TEMPORARY holding screen at PHOTO until the
+ * Photo slice exists. It does not pretend Photo is implemented; once it is,
+ * Interests leads straight to Photo and this screen is removed.
  */
 export default function SetupContinueScreen() {
   const { signOut } = useAppState();
@@ -42,9 +41,7 @@ export default function SetupContinueScreen() {
         <AppText variant="bodyLarge" style={styles.strong}>
           Your profile basics are saved.
         </AppText>
-        <AppText tone="secondary">
-          Next, you’ll add the languages you speak and your interests.
-        </AppText>
+        <AppText tone="secondary">Next, you’ll add a profile photo.</AppText>
         {holding && (
           <InlineMessage
             tone="info"

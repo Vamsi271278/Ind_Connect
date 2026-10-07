@@ -20,6 +20,14 @@ import {
   updateMyIntentsBodySchema,
 } from './intents.js';
 import {
+  interestCatalogResponseSchema,
+  languageListResponseSchema,
+  myInterestsResponseSchema,
+  myLanguagesResponseSchema,
+  updateMyInterestsBodySchema,
+  updateMyLanguagesBodySchema,
+} from './taxonomy.js';
+import {
   cityListResponseSchema,
   myLocationResponseSchema,
   updateMyLocationBodySchema,
@@ -257,6 +265,59 @@ export function buildOpenApiDocument(): Json {
           },
         },
       },
+      '/api/v1/profile/languages': {
+        get: {
+          operationId: 'listLanguages',
+          tags: ['profile'],
+          summary: 'Active languages in display order (bounded reference data)',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          responses: { '200': success('Languages', 'LanguageListResponse'), ...errors(401, 403) },
+        },
+      },
+      '/api/v1/profile/interests': {
+        get: {
+          operationId: 'listInterests',
+          tags: ['profile'],
+          summary: 'Active interest categories, each with its active interests',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          responses: {
+            '200': success('Interest catalog', 'InterestCatalogResponse'),
+            ...errors(401, 403),
+          },
+        },
+      },
+      '/api/v1/users/me/languages': {
+        put: {
+          operationId: 'updateMyLanguages',
+          tags: ['users'],
+          summary:
+            'Replace the languages (at least 1, by code). Atomic: any unknown or inactive code fails the whole save. Allowed from LANGUAGE onward; advances LANGUAGE to INTERESTS',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          requestBody: { required: true, ...jsonBody(ref('UpdateMyLanguagesBody')) },
+          responses: {
+            '200': success('Saved languages', 'MyLanguagesResponse'),
+            ...errors(400, 401, 403, 409),
+          },
+        },
+      },
+      '/api/v1/users/me/interests': {
+        put: {
+          operationId: 'updateMyInterests',
+          tags: ['users'],
+          summary:
+            'Replace the interests (at least 3, by code). Atomic: any unknown or inactive code fails the whole save. Allowed from INTERESTS onward; advances INTERESTS to PHOTO',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          requestBody: { required: true, ...jsonBody(ref('UpdateMyInterestsBody')) },
+          responses: {
+            '200': success('Saved interests', 'MyInterestsResponse'),
+            ...errors(400, 401, 403, 409),
+          },
+        },
+      },
       '/api/v1/users/me/intents': {
         put: {
           operationId: 'updateMyIntents',
@@ -368,6 +429,12 @@ export function buildOpenApiDocument(): Json {
         BootstrapResponse: jsonSchema(bootstrapResponseSchema, 'output'),
         CityListResponse: jsonSchema(cityListResponseSchema, 'output'),
         IntentOptionsResponse: jsonSchema(intentOptionsResponseSchema, 'output'),
+        LanguageListResponse: jsonSchema(languageListResponseSchema, 'output'),
+        InterestCatalogResponse: jsonSchema(interestCatalogResponseSchema, 'output'),
+        UpdateMyLanguagesBody: jsonSchema(updateMyLanguagesBodySchema, 'input'),
+        UpdateMyInterestsBody: jsonSchema(updateMyInterestsBodySchema, 'input'),
+        MyLanguagesResponse: jsonSchema(myLanguagesResponseSchema, 'output'),
+        MyInterestsResponse: jsonSchema(myInterestsResponseSchema, 'output'),
         UpdateMyIntentsBody: jsonSchema(updateMyIntentsBodySchema, 'input'),
         MyIntentsResponse: jsonSchema(myIntentsResponseSchema, 'output'),
         PutDatingConsentBody: jsonSchema(putDatingConsentBodySchema, 'input'),
