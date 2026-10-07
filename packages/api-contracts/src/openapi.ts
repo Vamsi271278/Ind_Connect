@@ -13,6 +13,13 @@ import {
 } from './auth.js';
 import { errorEnvelopeSchema } from './errors.js';
 import {
+  datingConsentResponseSchema,
+  intentOptionsResponseSchema,
+  myIntentsResponseSchema,
+  putDatingConsentBodySchema,
+  updateMyIntentsBodySchema,
+} from './intents.js';
+import {
   cityListResponseSchema,
   myLocationResponseSchema,
   updateMyLocationBodySchema,
@@ -61,9 +68,9 @@ const errors = (...statuses: number[]) =>
 const ERROR_DESCRIPTIONS: Record<number, string> = {
   400: 'Validation failure (VALIDATION_FAILED, PHONE_INVALID, OTP_EXPIRED, …)',
   401: 'Not authenticated (AUTH_REQUIRED, SESSION_INVALID)',
-  403: 'Account cannot use this operation (ACCOUNT_NOT_ACTIVE)',
-  409: 'State conflict (idempotency, uniqueness, ONBOARDING_STEP_NOT_REACHED)',
-  422: 'Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE, CITY_NOT_AVAILABLE)',
+  403: 'Account or feature not available (ACCOUNT_NOT_ACTIVE, DATING_NOT_ELIGIBLE)',
+  409: 'State conflict (idempotency, uniqueness, ONBOARDING_STEP_NOT_REACHED, DATING_POLICY_OUTDATED)',
+  422: 'Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE, CITY_NOT_AVAILABLE, INTENT_REQUIRED)',
   429: 'Rate limited; see Retry-After (RATE_LIMITED, OTP_ATTEMPTS_EXCEEDED)',
   503: 'Dependency unavailable; fails closed (OTP_UNAVAILABLE, SERVICE_UNAVAILABLE)',
 };
@@ -90,6 +97,8 @@ export function buildOpenApiDocument(): Json {
       { name: 'auth' },
       { name: 'users' },
       { name: 'locations' },
+      { name: 'profile' },
+      { name: 'dating' },
       { name: 'app' },
       { name: 'operations' },
     ],
@@ -234,6 +243,59 @@ export function buildOpenApiDocument(): Json {
           },
         },
       },
+      '/api/v1/profile/intents': {
+        get: {
+          operationId: 'listIntentOptions',
+          tags: ['profile'],
+          summary:
+            'Top-level intent options; DATING and the dating policy version only while the Dating kill switch is on',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          responses: {
+            '200': success('Intent options', 'IntentOptionsResponse'),
+            ...errors(401, 403),
+          },
+        },
+      },
+      '/api/v1/users/me/intents': {
+        put: {
+          operationId: 'updateMyIntents',
+          tags: ['users'],
+          summary:
+            'Replace the active non-dating intents (DATING changes only via dating consent). Allowed from INTENT onward; advances INTENT → LANGUAGE',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          requestBody: { required: true, ...jsonBody(ref('UpdateMyIntentsBody')) },
+          responses: {
+            '200': success('Active intents', 'MyIntentsResponse'),
+            ...errors(400, 401, 403, 409, 422),
+          },
+        },
+      },
+      '/api/v1/users/me/dating/consent': {
+        put: {
+          operationId: 'putMyDatingConsent',
+          tags: ['dating'],
+          summary:
+            'Affirmatively opt in to Dating for the current policy version; records consent and activates DATING atomically. Idempotent',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          requestBody: { required: true, ...jsonBody(ref('PutDatingConsentBody')) },
+          responses: {
+            '200': success('Dating enabled', 'DatingConsentResponse'),
+            ...errors(400, 401, 403, 409),
+          },
+        },
+        delete: {
+          operationId: 'deleteMyDatingConsent',
+          tags: ['dating'],
+          summary:
+            'Withdraw dating consent and deactivate DATING atomically. Never blocked (kill switch, onboarding step or intent minimum). Idempotent',
+          parameters: [correlationParameter],
+          security: [{ bearerAuth: [] }],
+          responses: { '204': noContent('Dating disabled'), ...errors(401) },
+        },
+      },
       '/api/v1/locations/cities': {
         get: {
           operationId: 'listCities',
@@ -305,6 +367,11 @@ export function buildOpenApiDocument(): Json {
         SelfUser: jsonSchema(selfUserSchema, 'output'),
         BootstrapResponse: jsonSchema(bootstrapResponseSchema, 'output'),
         CityListResponse: jsonSchema(cityListResponseSchema, 'output'),
+        IntentOptionsResponse: jsonSchema(intentOptionsResponseSchema, 'output'),
+        UpdateMyIntentsBody: jsonSchema(updateMyIntentsBodySchema, 'input'),
+        MyIntentsResponse: jsonSchema(myIntentsResponseSchema, 'output'),
+        PutDatingConsentBody: jsonSchema(putDatingConsentBodySchema, 'input'),
+        DatingConsentResponse: jsonSchema(datingConsentResponseSchema, 'output'),
         UpdateMyLocationBody: jsonSchema(updateMyLocationBodySchema, 'input'),
         MyLocationResponse: jsonSchema(myLocationResponseSchema, 'output'),
       },

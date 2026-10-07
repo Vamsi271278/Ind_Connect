@@ -71,6 +71,17 @@ class DrizzleLocationRepository implements LocationRepository {
     return row === undefined ? undefined : toCity(row);
   }
 
+  async findUserCity(userId: string): Promise<City | undefined> {
+    const [row] = await this.db
+      .select(cityColumns)
+      .from(userLocations)
+      .innerJoin(cities, eq(cities.id, userLocations.cityId))
+      .innerJoin(metros, eq(metros.id, cities.metroId))
+      .where(eq(userLocations.userId, userId))
+      .limit(1);
+    return row === undefined ? undefined : toCity(row);
+  }
+
   async upsertUserLocation(userId: string, location: ManualCityLocation, at: Date): Promise<void> {
     await this.db
       .insert(userLocations)

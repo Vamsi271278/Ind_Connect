@@ -11,7 +11,38 @@ import type { AuthContext } from '../../identity/application/session.service.js'
 import type { ProfileService, SelfUserView } from '../application/profile.service.js';
 import { PROFILE_SERVICE } from './tokens.js';
 
-const toDto = (view: SelfUserView): SelfUser => shapeResponse(selfUserSchema, view);
+/**
+ * Explicit self projection. The city is mapped field by field (city/metro
+ * context only); dating is a single boolean, never consent details.
+ */
+const toDto = (view: SelfUserView): SelfUser =>
+  shapeResponse(selfUserSchema, {
+    id: view.id,
+    accountStatus: view.accountStatus,
+    onboarding: view.onboarding,
+    profile: view.profile,
+    phoneMasked: view.phoneMasked,
+    age: view.age,
+    location:
+      view.location === null
+        ? null
+        : {
+            city: {
+              id: view.location.city.id,
+              name: view.location.city.name,
+              stateRegion: view.location.city.stateRegion,
+              countryCode: view.location.city.countryCode,
+              metro: {
+                id: view.location.city.metro.id,
+                code: view.location.city.metro.code,
+                name: view.location.city.metro.name,
+              },
+              launchStatus: view.location.city.launchStatus,
+            },
+          },
+    activeIntents: [...view.activeIntents],
+    datingEnabled: view.datingEnabled,
+  });
 
 /**
  * `/api/v1/users/me*`. Self only: identity comes from the server session,

@@ -36,18 +36,26 @@ export function Chevron({
 export function BackButton({
   onPress,
   label = 'Back',
+  disabled = false,
 }: {
   readonly onPress: () => void;
   readonly label?: string;
+  /** e.g. while a consequential request is in flight. */
+  readonly disabled?: boolean;
 }) {
   const { backButton } = useTheme().components;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       hitSlop={4}
-      style={[styles.button, { width: backButton.size, height: backButton.size }]}
+      style={[
+        styles.button,
+        { width: backButton.size, height: backButton.size, opacity: disabled ? 0.4 : 1 },
+      ]}
     >
       <Chevron direction="left" color={backButton.icon} />
     </Pressable>

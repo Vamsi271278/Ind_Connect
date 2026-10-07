@@ -80,3 +80,23 @@ export function nextOnboardingStateAfterLocation(current: {
   }
   return { status: current.status, step: 'INTENT', completedSteps: [LOCATION_STEP] };
 }
+
+const INTENT_STEP: OnboardingStep = 'INTENT';
+
+/** Intents and dating consent are never collected before INTENT (B4.2A). */
+export const hasReachedIntentStep = (step: OnboardingStep): boolean =>
+  indexOf(step) >= indexOf(INTENT_STEP);
+
+/**
+ * Applied after an intent save. Exactly INTENT → LANGUAGE, and only with at
+ * least one active intent (BR-INT-001); later steps are untouched.
+ */
+export function nextOnboardingStateAfterIntents(
+  current: { readonly status: OnboardingStatus; readonly step: OnboardingStep },
+  activeIntentCount: number,
+): OnboardingTransition {
+  if (current.step !== INTENT_STEP || activeIntentCount < 1) {
+    return { status: current.status, step: current.step, completedSteps: [] };
+  }
+  return { status: current.status, step: 'LANGUAGE', completedSteps: [INTENT_STEP] };
+}

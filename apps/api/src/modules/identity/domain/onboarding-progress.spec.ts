@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { ageInYears, parseCalendarDate } from './age.js';
 import { ONBOARDING_STEPS } from './account.js';
 import {
+  hasReachedIntentStep,
   hasReachedLocationStep,
   isGenderComplete,
   isNameComplete,
   nextOnboardingState,
+  nextOnboardingStateAfterIntents,
   nextOnboardingStateAfterLocation,
   type OnboardingProfileFacts,
 } from './onboarding-progress.js';
@@ -103,6 +105,36 @@ describe('location step rule (B4.1-D3)', () => {
     for (const step of ['INTENT', 'COMPLETE'] as const) {
       expect(nextOnboardingStateAfterLocation(at(step))).toEqual({
         ...at(step),
+        completedSteps: [],
+      });
+    }
+  });
+});
+
+describe('intent step rule (B4.2A)', () => {
+  it('allows intents and dating consent only from INTENT onward', () => {
+    expect(ONBOARDING_STEPS.filter(hasReachedIntentStep)[0]).toBe('INTENT');
+    for (const step of ['NAME', 'GENDER', 'LOCATION'] as const) {
+      expect(hasReachedIntentStep(step)).toBe(false);
+    }
+  });
+
+  it('advances INTENT → LANGUAGE only with at least one active intent', () => {
+    expect(nextOnboardingStateAfterIntents(at('INTENT'), 1)).toEqual({
+      status: 'IN_PROGRESS',
+      step: 'LANGUAGE',
+      completedSteps: ['INTENT'],
+    });
+    expect(nextOnboardingStateAfterIntents(at('INTENT'), 0)).toMatchObject({
+      step: 'INTENT',
+      completedSteps: [],
+    });
+  });
+
+  it('never rewinds or skips after INTENT', () => {
+    for (const step of ['COMPLETE'] as const) {
+      expect(nextOnboardingStateAfterIntents(at(step), 0)).toMatchObject({
+        step,
         completedSteps: [],
       });
     }

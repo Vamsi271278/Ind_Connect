@@ -15,6 +15,7 @@ import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
 import { cityLabel, filterCities } from '@/core/city-search';
 import { useCities, useLocationSave } from '@/features/onboarding/useLocation';
+import { useSelf } from '@/features/onboarding/useProfileSave';
 
 /**
  * O03 Location — manual city choice only (B4.1-D2): no GPS, no permission
@@ -27,7 +28,10 @@ export default function LocationScreen() {
   const cities = useCities();
   const { save, busy, error } = useLocationSave();
   const [query, setQuery] = useState('');
-  const [cityId, setCityId] = useState<string>();
+  const self = useSelf();
+  // The user's choice if any, otherwise the saved city (pre-fill when returning).
+  const [chosenCityId, setCityId] = useState<string>();
+  const cityId = chosenCityId ?? self.data?.location?.city.id;
 
   // A failed background refetch keeps the last good list (TanStack retains
   // data), so the list — and any selection — stays visible and usable.
@@ -48,7 +52,7 @@ export default function LocationScreen() {
 
   const onContinue = async () => {
     if (selected === undefined) return;
-    if (await save(selected.id)) router.replace('/setup-continue');
+    if (await save(selected.id)) router.push('/intent');
   };
 
   return (

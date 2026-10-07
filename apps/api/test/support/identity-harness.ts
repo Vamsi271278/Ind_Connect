@@ -22,11 +22,19 @@ import { JoseAccessTokenService } from '../../src/modules/identity/infrastructur
 import { BootstrapService } from '../../src/modules/configuration/application/bootstrap.service.js';
 import { OnboardingProgressService } from '../../src/modules/identity/application/onboarding-progress.service.js';
 import { SelfAccountQuery } from '../../src/modules/identity/application/self-account.query.js';
+import { DatingConsentService } from '../../src/modules/dating/application/dating-consent.service.js';
+import { LocationQuery } from '../../src/modules/location/application/location.query.js';
 import { LocationService } from '../../src/modules/location/application/location.service.js';
+import {
+  DatingIntentWriter,
+  type DatingAvailability,
+  IntentService,
+} from '../../src/modules/profile/application/intent.service.js';
 import { ProfileService } from '../../src/modules/profile/application/profile.service.js';
 import { AnalyticsTracker } from '../../src/shared/analytics/analytics.js';
 import { KeyedHasher } from '../../src/shared/crypto/crypto.js';
 import { InMemoryAnalyticsProvider } from './in-memory-analytics.js';
+import { InMemoryDatingConsentStore, InMemoryIntentStore } from './in-memory-intents.js';
 import { InMemoryLocationStore } from './in-memory-location.js';
 import { InMemoryProfileStore, InMemoryUnitOfWork } from './in-memory-profile.js';
 import { InMemoryEphemeralStore } from './in-memory-ephemeral-store.js';
@@ -79,6 +87,7 @@ export function createIdentityHarness(
     readonly countryPolicy?: CountryPolicy;
     readonly provider?: PhoneVerificationProvider;
     readonly settings?: Partial<OtpSettings>;
+    readonly dating?: DatingAvailability;
   } = {},
 ) {
   const clock = new ManualClock('2026-10-05T12:00:00.000Z');
@@ -149,7 +158,15 @@ export function createIdentityHarness(
 
   const profiles = new InMemoryProfileStore();
   const locations = new InMemoryLocationStore();
-  const unitOfWork = new InMemoryUnitOfWork(store, profiles, locations);
+  const intents = new InMemoryIntentStore();
+  const consents = new InMemoryDatingConsentStore();
+  const unitOfWork = new InMemoryUnitOfWork(store, [profiles, locations, intents, consents]);
+  // Dating defaults to ON in the harness so its behavior is testable; the
+  // kill-switch tests pass { enabled: false } explicitly.
+  const dating: DatingAvailability = options.dating ?? {
+    enabled: true,
+    policyVersion: 'dating-test-v1',
+  };
   const onboarding = new OnboardingProgressService(store, clock);
   const selfAccount = new SelfAccountQuery(store, clock);
   const profileService = new ProfileService({
@@ -157,8 +174,27 @@ export function createIdentityHarness(
     profiles,
     onboarding,
     selfAccount,
+    locations: new LocationQuery(locations),
+    intents,
     analytics,
     clock,
+  });
+  const intentService = new IntentService({
+    unitOfWork,
+    intents,
+    onboarding,
+    analytics,
+    clock,
+    dating,
+  });
+  const datingConsentService = new DatingConsentService({
+    unitOfWork,
+    consents,
+    datingIntent: new DatingIntentWriter(intents),
+    onboarding,
+    analytics,
+    clock,
+    dating,
   });
   const locationService = new LocationService({
     unitOfWork,
@@ -207,6 +243,10 @@ export function createIdentityHarness(
     profileService,
     locations,
     locationService,
+    intents,
+    consents,
+    intentService,
+    datingConsentService,
     bootstrap,
     clock,
     ephemeral,

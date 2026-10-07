@@ -3,9 +3,15 @@ import {
   bootstrapResponseSchema,
   type CityListResponse,
   cityListResponseSchema,
+  type DatingConsentResponse,
+  datingConsentResponseSchema,
   type DeviceContext,
   errorEnvelopeSchema,
   IDEMPOTENCY_KEY_HEADER,
+  type IntentOptionsResponse,
+  intentOptionsResponseSchema,
+  type MyIntentsResponse,
+  myIntentsResponseSchema,
   type MyLocationResponse,
   myLocationResponseSchema,
   type OtpRequestResponse,
@@ -18,6 +24,7 @@ import {
   registrationResponseSchema,
   type SelfUser,
   selfUserSchema,
+  type UpdateMyIntentsBody,
   type UpdateMyLocationBody,
   type UpdateProfileBody,
 } from '@project-connect/api-contracts';
@@ -41,7 +48,7 @@ export interface ApiClientDependencies {
 type Auth = 'none' | 'optional' | 'required';
 
 interface RequestSpec {
-  readonly method: 'GET' | 'POST' | 'PATCH';
+  readonly method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   readonly path: string;
   readonly body?: unknown;
   readonly auth: Auth;
@@ -262,6 +269,45 @@ export class ApiClient {
       path: '/api/v1/users/me/location',
       body,
       schema: myLocationResponseSchema,
+      auth: 'required',
+    });
+  }
+
+  listIntentOptions(): Promise<IntentOptionsResponse> {
+    return this.request({
+      method: 'GET',
+      path: '/api/v1/profile/intents',
+      schema: intentOptionsResponseSchema,
+      auth: 'required',
+    });
+  }
+
+  updateMyIntents(body: UpdateMyIntentsBody): Promise<MyIntentsResponse> {
+    return this.request({
+      method: 'PUT',
+      path: '/api/v1/users/me/intents',
+      body,
+      schema: myIntentsResponseSchema,
+      auth: 'required',
+    });
+  }
+
+  /** O05 affirmative opt-in for the policy version the server is serving. */
+  putDatingConsent(policyVersion: string): Promise<DatingConsentResponse> {
+    return this.request({
+      method: 'PUT',
+      path: '/api/v1/users/me/dating/consent',
+      body: { policyVersion },
+      schema: datingConsentResponseSchema,
+      auth: 'required',
+    });
+  }
+
+  /** Withdraws dating consent. Always allowed; idempotent. */
+  deleteDatingConsent(): Promise<void> {
+    return this.requestNoContent({
+      method: 'DELETE',
+      path: '/api/v1/users/me/dating/consent',
       auth: 'required',
     });
   }

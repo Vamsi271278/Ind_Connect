@@ -6,6 +6,7 @@ export { AppLogo, type AppLogoProps } from './AppLogo.js';
 export { AppText, type AppTextProps, type TextTone } from './AppText.js';
 export { BackButton, Chevron } from './BackButton.js';
 export { Button, type ButtonProps } from './Button.js';
+export { CheckboxRow, type CheckboxRowProps } from './CheckboxRow.js';
 export { InlineMessage, type InlineMessageProps } from './InlineMessage.js';
 export {
   formatNationalNumber,

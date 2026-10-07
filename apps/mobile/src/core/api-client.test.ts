@@ -16,6 +16,9 @@ const me = {
   profile: { firstName: null, genderCode: null, genderSelfDescription: null },
   phoneMasked: '+1 ••• ••• 0123',
   age: 31,
+  location: null,
+  activeIntents: [],
+  datingEnabled: false,
 };
 
 /**

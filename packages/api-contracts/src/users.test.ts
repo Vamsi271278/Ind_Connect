@@ -49,6 +49,9 @@ describe('selfUserSchema', () => {
     profile: { firstName: null, genderCode: null, genderSelfDescription: null },
     phoneMasked: '+1 ••• ••• 0123',
     age: 31,
+    location: null,
+    activeIntents: [],
+    datingEnabled: false,
   };
 
   it('accepts the self projection and refuses any extra private field', () => {
@@ -58,9 +61,37 @@ describe('selfUserSchema', () => {
       { phoneE164: '+12145550123' },
       { tokenFamilyId: 'x' },
       { createdAt: 'x' },
+      // Dating consent internals never leave the dating module.
+      { datingPolicyVersion: 'dating-draft-2026-10-v0' },
+      { datingConsentedAt: 'x' },
+      { datingConsent: { source: 'ONBOARDING' } },
     ]) {
       expect(selfUserSchema.safeParse({ ...valid, ...leak }).success).toBe(false);
     }
+  });
+
+  it('carries saved choices: city/metro only, top-level intents and a dating boolean', () => {
+    const city = {
+      id: '7d2c1b0a-9e8f-4d6c-8b5a-4f3e2d1c0b9a',
+      name: 'Frisco',
+      stateRegion: 'TX',
+      countryCode: 'US',
+      metro: { id: '0b5f7f4e-3c1d-4a8e-9f6b-1a2b3c4d5e6f', code: 'DFW', name: 'Dallas–Fort Worth' },
+      launchStatus: 'ACTIVE',
+    };
+    const saved = {
+      ...valid,
+      location: { city },
+      activeIntents: ['FRIENDSHIP', 'DATING'],
+      datingEnabled: true,
+    };
+    expect(selfUserSchema.safeParse(saved).success).toBe(true);
+    expect(selfUserSchema.safeParse({ ...saved, location: { city, latitude: 33.1 } }).success).toBe(
+      false,
+    );
+    expect(selfUserSchema.safeParse({ ...saved, activeIntents: ['CASUAL_DATING'] }).success).toBe(
+      false,
+    );
   });
 });
 

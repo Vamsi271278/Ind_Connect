@@ -63,6 +63,15 @@ export function describeAuthFailure(error: unknown): AuthFailure {
         kind: 'banner',
         message: "That city isn't available right now. Please choose another.",
       };
+    case 'INTENT_REQUIRED':
+      return { kind: 'banner', message: 'Choose at least one option to continue.' };
+    case 'DATING_NOT_ELIGIBLE':
+      return { kind: 'banner', message: 'Dating isn’t available right now.' };
+    case 'DATING_POLICY_OUTDATED':
+      return {
+        kind: 'banner',
+        message: 'The dating details have been updated. Please review them and try again.',
+      };
     case 'ONBOARDING_STEP_NOT_REACHED':
       return { kind: 'banner', message: 'Please finish the earlier steps first.' };
     default:

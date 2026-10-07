@@ -36,6 +36,9 @@ describe('ProfileService', () => {
       profile: { firstName: null, genderCode: null, genderSelfDescription: null },
       phoneMasked: '+1 ••• ••• 0123',
       age: 31,
+      location: null,
+      activeIntents: [],
+      datingEnabled: false,
     });
     const text = JSON.stringify(me);
     expect(text).not.toContain('1995-06-15');

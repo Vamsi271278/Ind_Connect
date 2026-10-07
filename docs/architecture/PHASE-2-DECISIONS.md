@@ -202,7 +202,7 @@ For invite-only Cohort 1, only approved DFW cities can complete Location. The sc
 
 - `GET /api/v1/locations/cities` (authenticated): ACTIVE cities in ACTIVE metros, by name, as `{ id, name, stateRegion, countryCode, metro: { id, code, name }, launchStatus }`. No coordinates, timezone or neighborhood. The list is a small bounded taxonomy, so it is returned whole (not cursor-paginated) and the client filters locally; it is not a people or geocoding search (ADR-045).
 - `PATCH /api/v1/users/me/location` accepts exactly `{ cityId }`; metro, country, precision and source are server-derived and any other field is `400 VALIDATION_FAILED`. Unknown and non-selectable cities are both `422 CITY_NOT_AVAILABLE`. Allowed for ACTIVE and PENDING_VERIFICATION accounts (guard default). Re-sending the same city is naturally idempotent (state-setting overwrite), so no Idempotency-Key is required.
-- Response: `{ location: { city }, onboarding: { status, step } }`. `GET /users/me` does not yet include the location; the Location screen does not pre-select a previously saved city.
+- Response: `{ location: { city }, onboarding: { status, step } }`. `GET /users/me` does not yet include the location; the Location screen does not pre-select a previously saved city. _(Superseded by B4.2A-D6: `/users/me` now returns `location` and the screen pre-selects it.)_
 
 ### B4.1-D7 — Holding screen
 
@@ -226,3 +226,72 @@ The B3 "Great start." holding screen now sits at **INTENT** (after Location) unt
 6. Load-error and "Try again" states render and recover once the API returns; a withdrawn city returns `CITY_NOT_AVAILABLE`, refreshes the list and clears the selection.
 7. At font scale 2.0, the heading, city rows, notes, privacy caption, Continue and the holding screen are unclipped.
 8. TalkBack semantics: labelled search field; city rows expose the radio role with checked state; buttons expose enabled/busy state. Spoken output was not audibly verified (adb cannot drive TalkBack gestures); a hands-on TalkBack pass remains advisable before release. iOS VoiceOver: pending (no macOS device).
+
+---
+
+## B4.2A — Intent + explicit Dating opt-in (O04/O05)
+
+**APPROVED 2026-10-06** by the project owner. Migration `0002_intent_dating_foundation` (intent_options, user_intents, dating_consents + reviewed intent seed).
+
+### B4.2A-D1 — Dating kill switch
+
+Dating is implemented but **OFF by default in every environment** (ADR-094, ADR-032, T&S §190 release gate).
+
+- `DATING_ENABLED=false` (default) → DATING is absent from `GET /profile/intents`, `PUT /users/me/dating/consent` returns `403 DATING_NOT_ELIGIBLE`, and `DELETE` still works.
+- `DATING_ENABLED=true` may be set **deliberately** in local/staging to test. It requires `DATING_POLICY_VERSION`; config validation refuses a missing version, and refuses any version containing "draft" when `NODE_ENV=production`.
+- `DATING_ENABLED` is the only source of the bootstrap `dating_enabled` flag; setting it through `FEATURE_FLAGS` is rejected.
+- Production stays `DATING_ENABLED=false` until legal, product and safety approve a real policy version (e.g. `dating-2026-XX-v1`). The local/staging test version is `dating-draft-2026-10-v0`, held in configuration, never in seed data.
+- Not yet enforced: the `USE_DATING` capability restriction (`user_restrictions` is not built). Add it to opt-in when restrictions exist.
+
+### B4.2A-D2 — Consent semantics and invariant
+
+- `dating_consents` is append-only evidence that the user **affirmatively accepted the currently configured dating policy version**. It is not proof that the user read or viewed the text. Opt-in inserts a row; withdrawal sets `revoked_at`; history is retained per the approved retention policy. No IP or device metadata.
+- Invariant: **active DATING intent ⇔ exactly one active (unrevoked) consent.** Revoked historical consents may coexist with an inactive DATING. The partial unique index enforces at most one active consent; the cross-table invariant is held by the dating module (both writes in one transaction under the user row lock) and proven by unit and integration tests, including failure-injection and race tests.
+- Opting in to a newer policy version revokes the older active consent and records a new one.
+
+### B4.2A-D3 — Ownership
+
+Profile owns `intent_options` and `user_intents` and handles the social intents. The dating module owns `dating_consents` and is the **only** writer of the DATING intent (through profile's `DatingIntentWriter`). This avoids a profile↔dating dependency cycle and keeps the invariant in one place.
+
+### B4.2A-D4 — API (supersedes the original SFS O05 endpoint)
+
+- `GET /api/v1/profile/intents` — active top-level options in display order, plus `dating: { policyVersion }` only while enabled. Sub-intents (CASUAL_DATING, SERIOUS_RELATIONSHIP) are seeded reference data only: not exposed, selectable or used.
+- `PUT /api/v1/users/me/intents` `{ intents: [FRIENDSHIP|ACTIVITIES|NETWORKING…] }` — replace semantics for the non-dating intents; DATING in the body is `400`. At least one active intent overall (DATING counts) or `422 INTENT_REQUIRED`. Deselected rows are kept inactive.
+- `PUT /api/v1/users/me/dating/consent` `{ policyVersion }` — must equal the served version (`409 DATING_POLICY_OUTDATED`); source ONBOARDING until onboarding is complete, then SETTINGS; idempotent. Response `{ datingEnabled: true }` only.
+- `DELETE /api/v1/users/me/dating/consent` — `204`, idempotent, **never blocked**: not by the kill switch, the onboarding step, account status (it allows any authenticated account, like logout) or the intent minimum.
+
+### B4.2A-D5 — Progression and withdrawal
+
+| Step at write time | Intents / consent |
+|---|---|
+| before INTENT | `409 ONBOARDING_STEP_NOT_REACHED`; nothing stored (withdrawal excepted) |
+| INTENT | intent save with ≥1 active intent → INTENT → LANGUAGE in the same transaction |
+| after INTENT | edits allowed, never rewind |
+
+Withdrawing Dating when it is the only intent is allowed: zero active intents, onboarding not rewound, nothing auto-selected. The profile is then incomplete (BR-INT-001); onboarding completion (later) must require ≥1 active intent again. Ordinary intent edits can never reach zero.
+
+Every write except withdrawal re-checks account status under the user row lock (B4.1-D8).
+
+### B4.2A-D6 — Self projection
+
+`GET /users/me` adds `location` (city/metro), `activeIntents` (top-level) and `datingEnabled` (derived from the DATING intent, which the invariant ties to an active consent). These are **self-only**; `datingEnabled` must never appear on public or general profile DTOs (BR-DATE-008). Policy version, consent timestamps, source and history are never returned. Location and Intent now pre-select saved choices.
+
+### B4.2A-D7 — Analytics
+
+`onboarding_step_completed {step_code: INTENT}`, `dating_enabled {source: onboarding|settings}` and `dating_disabled`, emitted after commit and only on an actual state change. No intent codes, policy versions or consent times enter analytics. `intent_selected` (SFS) is not a registry event and is not emitted.
+
+### B4.2A-D8 — Screens
+
+- O04: four neutral multi-select cards (label + description from `intent_options.description`), using the new shared `CheckboxRow` (checkbox role; checked shown by border, tint, weight and a check mark). Dating has no special colour or icon. Selecting Dating opens O05; deselecting it withdraws immediately.
+- O05: "Dating is optional" with a deliberate **Opt in to dating** button (replacing the SFS checkbox) and **Not now**. SFS O04/O05 were revised accordingly.
+- The holding screen now sits at LANGUAGE until B4.2B.
+
+### B4.2A-D9 — Review follow-ups
+
+- **Withdrawal under clock skew.** `revoked_at` and `deselected_at` are written as `GREATEST(now, consented_at/selected_at)`, so a withdrawal handled by a server whose clock is behind can never violate the ordering CHECKs and fail (integration-tested).
+- **Accessibility.** The O04 list has a list role; the Dating row reports busy while turning off and announces "Dating turned off"; O05 has loading and retry states and disables Back while the opt-in is in flight. O04 shows the approved line "You control which types of connections you appear in." The holding screen copy reverts to the B3 "Your profile basics are saved." now that it follows Intent.
+- **Release gate for enabling Dating anywhere beyond local/staging testing** (added to T&S §190 scope, not built in B4.2A):
+  1. O05 must show or link the actual dating policy text for the version being accepted.
+  2. Turning the kill switch off does **not** revoke existing opt-ins. Every future dating surface (discovery, connection reasons, dating events) must require `DATING_ENABLED` **and** the user's dating state, with an acceptance test that switch-off plus an existing consent yields zero dating exposure. Whether switch-off should also suspend existing participation is a product/safety decision to confirm then.
+  3. The `USE_DATING` capability restriction must be enforced on opt-in once `user_restrictions` exists.
+  4. While the switch is off, an active DATING still counts toward the one-intent minimum; revisit with onboarding completion.

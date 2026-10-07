@@ -27,7 +27,10 @@ export function useLocationSave() {
     setError(undefined);
     try {
       await api.updateMyLocation({ cityId });
-      await queryClient.invalidateQueries({ queryKey: ['bootstrap'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['bootstrap'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.me }),
+      ]);
       return true;
     } catch (caught) {
       const failure = describeAuthFailure(caught);

@@ -29,6 +29,10 @@ export const ERROR_CODES = [
   // Onboarding / location
   'ONBOARDING_STEP_NOT_REACHED',
   'CITY_NOT_AVAILABLE',
+  // Intent / dating
+  'INTENT_REQUIRED',
+  'DATING_NOT_ELIGIBLE',
+  'DATING_POLICY_OUTDATED',
   // Throttling / availability
   'RATE_LIMITED',
   'OTP_UNAVAILABLE',

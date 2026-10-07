@@ -10,7 +10,18 @@ import type { Database } from '../../src/shared/database/database.module.js';
 import * as schema from '../../src/shared/database/schema/index.js';
 import { resetDatabase } from '../support/integration-db.js';
 
-const { users, userSessions, userProfiles, genderOptions, metros, cities, userLocations } = schema;
+const {
+  users,
+  userSessions,
+  userProfiles,
+  genderOptions,
+  metros,
+  cities,
+  userLocations,
+  intentOptions,
+  userIntents,
+  datingConsents,
+} = schema;
 
 let pool: pg.Pool;
 let db: Database;
@@ -451,5 +462,124 @@ describe('metros / cities / user_locations', () => {
         }),
       ),
     ).toBe('23505');
+  });
+});
+
+describe('intent_options / user_intents / dating_consents', () => {
+  const newUser = async (phone: string) => {
+    const [row] = await db
+      .insert(users)
+      .values(userValues({ phoneE164: phone, onboardingStep: 'INTENT' }))
+      .returning();
+    if (row === undefined) throw new Error('user insert failed');
+    return row;
+  };
+  const consent = (
+    userId: string,
+    overrides: Partial<typeof datingConsents.$inferInsert> = {},
+  ): typeof datingConsents.$inferInsert => ({
+    userId,
+    policyVersion: 'dating-draft-2026-10-v0',
+    source: 'ONBOARDING',
+    consentedAt: new Date('2026-10-06T12:00:00Z'),
+    ...overrides,
+  });
+
+  it('seeds four top-level intents and two dating sub-intents', async () => {
+    const rows = await db.select().from(intentOptions);
+    const shape = rows.map((r) => `${r.code}:${r.parentCode ?? '-'}`).sort();
+    expect(shape).toEqual(
+      [
+        'ACTIVITIES:-',
+        'CASUAL_DATING:DATING',
+        'DATING:-',
+        'FRIENDSHIP:-',
+        'NETWORKING:-',
+        'SERIOUS_RELATIONSHIP:DATING',
+      ].sort(),
+    );
+    expect(rows.every((r) => r.active)).toBe(true);
+  });
+
+  it('rejects a self-parented or unknown-parent option', async () => {
+    const base = { label: 'X', displayOrder: 9 };
+    expect(
+      await sqlState(
+        db.insert(intentOptions).values({ ...base, code: 'LOOP', parentCode: 'LOOP' }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(intentOptions).values({ ...base, code: 'ORPHAN', parentCode: 'NOPE' }),
+      ),
+    ).toBe('23503');
+  });
+
+  it('keeps user_intents consistent: one row per (user, intent), active ⇔ not deselected', async () => {
+    const user = await newUser('+12145550701');
+    const at = new Date('2026-10-06T12:00:00Z');
+    await db
+      .insert(userIntents)
+      .values({ userId: user.id, intentCode: 'FRIENDSHIP', active: true, selectedAt: at });
+    expect(
+      await sqlState(
+        db
+          .insert(userIntents)
+          .values({ userId: user.id, intentCode: 'FRIENDSHIP', active: true, selectedAt: at }),
+      ),
+    ).toBe('23505');
+    expect(
+      await sqlState(
+        db
+          .insert(userIntents)
+          .values({ userId: user.id, intentCode: 'ACTIVITIES', active: false, selectedAt: at }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(userIntents).values({
+          userId: user.id,
+          intentCode: 'NETWORKING',
+          active: true,
+          selectedAt: at,
+          deselectedAt: at,
+        }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db
+          .insert(userIntents)
+          .values({ userId: user.id, intentCode: 'HOOKUP', active: true, selectedAt: at }),
+      ),
+    ).toBe('23503');
+  });
+
+  it('allows at most one active consent per user, with unlimited revoked history', async () => {
+    const user = await newUser('+12145550702');
+    const revokedAt = new Date('2026-10-06T13:00:00Z');
+    await db.insert(datingConsents).values(consent(user.id, { revokedAt }));
+    await db.insert(datingConsents).values(consent(user.id, { revokedAt }));
+    await db.insert(datingConsents).values(consent(user.id));
+    expect(await sqlState(db.insert(datingConsents).values(consent(user.id)))).toBe('23505');
+  });
+
+  it('validates consent source, version format and revocation order', async () => {
+    const user = await newUser('+12145550703');
+    expect(
+      await sqlState(db.insert(datingConsents).values(consent(user.id, { source: 'INFERRED' }))),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(datingConsents).values(consent(user.id, { policyVersion: 'has spaces' })),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db
+          .insert(datingConsents)
+          .values(consent(user.id, { revokedAt: new Date('2026-10-06T11:00:00Z') })),
+      ),
+    ).toBe('23514');
   });
 });

@@ -4,6 +4,7 @@ import type {
   LocationRepository,
   LocationStore,
 } from '../../src/modules/location/application/ports.js';
+import type { Snapshottable } from './in-memory-profile.js';
 import type {
   City,
   LaunchStatus,
@@ -24,7 +25,7 @@ const metro = (code: string, launchStatus: LaunchStatus) => ({
 });
 
 /** Test double for the location port, seeded with a mix of launch states. */
-export class InMemoryLocationStore implements LocationStore {
+export class InMemoryLocationStore implements LocationStore, Snapshottable {
   readonly dfw = metro('DFW', 'ACTIVE');
   readonly hou = metro('HOU', 'WAITLIST');
 
@@ -40,6 +41,13 @@ export class InMemoryLocationStore implements LocationStore {
   ];
 
   rows = new Map<string, StoredUserLocation>();
+
+  checkpoint(): () => void {
+    const saved = structuredClone(this.rows);
+    return () => {
+      this.rows = saved;
+    };
+  }
 
   private city(name: string, launchStatus: LaunchStatus, inMetro: City['metro']): City {
     return {
@@ -61,6 +69,12 @@ export class InMemoryLocationStore implements LocationStore {
   readonly repository: LocationRepository = {
     listCities: () => Promise.resolve([...this.cities]),
     findCityForShare: (cityId) => Promise.resolve(this.cities.find((c) => c.id === cityId)),
+    findUserCity: (userId) => {
+      const row = this.rows.get(userId);
+      return Promise.resolve(
+        row === undefined ? undefined : this.cities.find((c) => c.id === row.cityId),
+      );
+    },
     upsertUserLocation: (userId, location, at) => {
       // Same semantics as the PK upsert: one current row, overwritten in place.
       this.rows.set(userId, { ...location, capturedAt: at, updatedAt: at });

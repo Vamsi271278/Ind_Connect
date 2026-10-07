@@ -21,6 +21,12 @@
       "name": "locations"
     },
     {
+      "name": "profile"
+    },
+    {
+      "name": "dating"
+    },
+    {
       "name": "app"
     },
     {
@@ -622,6 +628,224 @@
         }
       }
     },
+    "/api/v1/profile/intents": {
+      "get": {
+        "operationId": "listIntentOptions",
+        "tags": [
+          "profile"
+        ],
+        "summary": "Top-level intent options; DATING and the dating policy version only while the Dating kill switch is on",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Intent options",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/IntentOptionsResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/intents": {
+      "put": {
+        "operationId": "updateMyIntents",
+        "tags": [
+          "users"
+        ],
+        "summary": "Replace the active non-dating intents (DATING changes only via dating consent). Allowed from INTENT onward; advances INTENT → LANGUAGE",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyIntentsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Active intents",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MyIntentsResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/dating/consent": {
+      "put": {
+        "operationId": "putMyDatingConsent",
+        "tags": [
+          "dating"
+        ],
+        "summary": "Affirmatively opt in to Dating for the current policy version; records consent and activates DATING atomically. Idempotent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutDatingConsentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dating enabled",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DatingConsentResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMyDatingConsent",
+        "tags": [
+          "dating"
+        ],
+        "summary": "Withdraw dating consent and deactivate DATING atomically. Never blocked (kill switch, onboarding step or intent minimum). Idempotent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Dating disabled",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          }
+        }
+      }
+    },
     "/api/v1/locations/cities": {
       "get": {
         "operationId": "listCities",
@@ -745,7 +969,7 @@
         }
       },
       "Error403": {
-        "description": "Account cannot use this operation (ACCOUNT_NOT_ACTIVE)",
+        "description": "Account or feature not available (ACCOUNT_NOT_ACTIVE, DATING_NOT_ELIGIBLE)",
         "headers": {
           "X-Correlation-ID": {
             "$ref": "#/components/headers/CorrelationId"
@@ -760,7 +984,7 @@
         }
       },
       "Error409": {
-        "description": "State conflict (idempotency, uniqueness, ONBOARDING_STEP_NOT_REACHED)",
+        "description": "State conflict (idempotency, uniqueness, ONBOARDING_STEP_NOT_REACHED, DATING_POLICY_OUTDATED)",
         "headers": {
           "X-Correlation-ID": {
             "$ref": "#/components/headers/CorrelationId"
@@ -775,7 +999,7 @@
         }
       },
       "Error422": {
-        "description": "Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE, CITY_NOT_AVAILABLE)",
+        "description": "Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE, CITY_NOT_AVAILABLE, INTENT_REQUIRED)",
         "headers": {
           "X-Correlation-ID": {
             "$ref": "#/components/headers/CorrelationId"
@@ -848,6 +1072,9 @@
                   "AGE_NOT_ELIGIBLE",
                   "ONBOARDING_STEP_NOT_REACHED",
                   "CITY_NOT_AVAILABLE",
+                  "INTENT_REQUIRED",
+                  "DATING_NOT_ELIGIBLE",
+                  "DATING_POLICY_OUTDATED",
                   "RATE_LIMITED",
                   "OTP_UNAVAILABLE",
                   "SERVICE_UNAVAILABLE",
@@ -1504,6 +1731,97 @@
             "type": "integer",
             "minimum": 18,
             "maximum": 9007199254740991
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "stateRegion": {
+                        "type": "string"
+                      },
+                      "countryCode": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{2}$"
+                      },
+                      "metro": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "launchStatus": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "WAITLIST",
+                          "FUTURE",
+                          "DISABLED"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "stateRegion",
+                      "countryCode",
+                      "metro",
+                      "launchStatus"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activeIntents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FRIENDSHIP",
+                "ACTIVITIES",
+                "NETWORKING",
+                "DATING"
+              ]
+            }
+          },
+          "datingEnabled": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1512,7 +1830,10 @@
           "onboarding",
           "profile",
           "phoneMasked",
-          "age"
+          "age",
+          "location",
+          "activeIntents",
+          "datingEnabled"
         ],
         "additionalProperties": false
       },
@@ -1671,6 +1992,173 @@
         },
         "required": [
           "cities"
+        ],
+        "additionalProperties": false
+      },
+      "IntentOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "FRIENDSHIP",
+                    "ACTIVITIES",
+                    "NETWORKING",
+                    "DATING"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "code",
+                "label",
+                "description"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "dating": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "policyVersion": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
+                  }
+                },
+                "required": [
+                  "policyVersion"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "options",
+          "dating"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateMyIntentsBody": {
+        "type": "object",
+        "properties": {
+          "intents": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FRIENDSHIP",
+                "ACTIVITIES",
+                "NETWORKING"
+              ]
+            }
+          }
+        },
+        "required": [
+          "intents"
+        ],
+        "additionalProperties": false
+      },
+      "MyIntentsResponse": {
+        "type": "object",
+        "properties": {
+          "activeIntents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FRIENDSHIP",
+                "ACTIVITIES",
+                "NETWORKING",
+                "DATING"
+              ]
+            }
+          },
+          "onboarding": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "step"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "activeIntents",
+          "onboarding"
+        ],
+        "additionalProperties": false
+      },
+      "PutDatingConsentBody": {
+        "type": "object",
+        "properties": {
+          "policyVersion": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
+          }
+        },
+        "required": [
+          "policyVersion"
+        ],
+        "additionalProperties": false
+      },
+      "DatingConsentResponse": {
+        "type": "object",
+        "properties": {
+          "datingEnabled": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "datingEnabled"
         ],
         "additionalProperties": false
       },

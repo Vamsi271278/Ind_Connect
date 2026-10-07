@@ -19,6 +19,8 @@ export const queryKeys = {
   me: ['user', 'me'] as const,
   /** Selectable launch cities: reference data, not account data. */
   cities: ['locations', 'cities'] as const,
+  /** O04 options; depends on the server's Dating kill switch, not the account. */
+  intentOptions: ['profile', 'intent-options'] as const,
 };
 
 export const getInstallId = createInstallIdProvider(secureStore, generateInstallId);

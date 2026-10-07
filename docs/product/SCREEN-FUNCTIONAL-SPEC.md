@@ -694,29 +694,32 @@ Precise coordinate stored only if necessary and protected.
 
 # SCREEN O04 — CONNECTION INTENT
 
+> **Revised 2026-10-06 (B4.2A, PHASE-2-DECISIONS).** Dating sub-intents are not shown on O04; the endpoint and Dating flow below supersede the original text.
+
 ## Purpose
 
 Capture why user is using the platform.
 
 ## UI
 
-Multi-select cards:
+Title: **What brings you to Connect?**
+
+Subtitle: Choose one or more. You can change these later.
+
+Multi-select cards (label + description, no special visual treatment for Dating):
 
 - Friendship
 - Activities
 - Professional Networking
-- Dating
+- Dating — offered only while the server-side Dating kill switch is on (ADR-094; T&S §190)
 
-If Dating selected:
+Dating sub-options (Casual Dating, Serious Relationship) are **not** shown here. They belong to the later Dating preferences flow (P05).
 
-show sub-options:
-
-- Casual Dating
-- Serious Relationship
+Selecting Dating does **not** enable it: it opens O05. Deselecting an enabled Dating withdraws consent immediately (DELETE, never blocked).
 
 ## Requirement
 
-Minimum one intent.
+Minimum one intent (an active Dating counts).
 
 ## Important UX Copy
 
@@ -728,52 +731,57 @@ Minimum one intent.
 
 ## Backend
 
-PUT `/users/me/intents`
+- GET `/api/v1/profile/intents` — options (+ dating policy version while enabled)
+- PUT `/api/v1/users/me/intents` — the non-dating intents only (DATING is rejected here)
 
 ## Analytics
 
-- intent_selected
-- dating_enabled
+- `onboarding_step_completed` (step INTENT)
+- `dating_enabled` / `dating_disabled` (emitted by the consent endpoints)
+
+`intent_selected` is not in the Analytics Specification registry and is not emitted.
 
 ---
 
 # SCREEN O05 — DATING CONSENT
 
-Only displayed if Dating selected.
+> **Revised 2026-10-06 (B4.2A).** A deliberate opt-in button replaces the checkbox; consent is a resource (PUT/DELETE).
+
+Only displayed when the user chooses Dating on O04 (or turns it on in P04).
 
 ## Purpose
 
-Obtain explicit dating discoverability consent.
+Obtain explicit, affirmative dating consent.
 
 ## UI
 
+Title: **Dating is optional**
+
 Explain:
 
-- profile can appear to mutually eligible users;
-- dating can be turned off at any time;
-- general social discovery remains separate.
+- Dating is a separate, opt-in part of Connect;
+- only people who also opt in can appear in dating discovery;
+- choosing dating does not imply consent to messages, meetups or sexual activity;
+- dating can be turned off at any time.
 
-Checkbox:
+Primary CTA: **Opt in to dating**
 
-**I understand and want to enable Dating discovery.**
-
-CTA:
-**Enable Dating**
-
-Secondary:
-**Not Now**
+Secondary: **Not now** (changes nothing)
 
 ## Rule
 
-No dating exposure until affirmative consent.
+No dating exposure until affirmative consent. Opt-in is unavailable while the Dating kill switch is off; withdrawal is always available.
 
 ## Backend
 
-POST `/users/me/dating/consent`
+- PUT `/api/v1/users/me/dating/consent` with `{ policyVersion }` — must equal the served version; records consent and activates DATING atomically; idempotent.
+- DELETE `/api/v1/users/me/dating/consent` — revokes consent and deactivates DATING atomically; idempotent; never blocked.
 
-Store:
-- accepted_at;
-- policy version.
+Store (append-only evidence that the user affirmatively accepted the configured policy version — not proof of reading it):
+- consented_at;
+- policy version;
+- source (ONBOARDING / SETTINGS);
+- revoked_at on withdrawal.
 
 ---
 

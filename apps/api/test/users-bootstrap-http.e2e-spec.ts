@@ -31,7 +31,8 @@ describe('bootstrap and users HTTP surface (e2e, no infrastructure)', () => {
     expect(bootstrapResponseSchema.parse(dataOf(response.body))).toEqual({
       maintenanceMode: false,
       minimumSupportedVersion: '0.0.0',
-      featureFlags: {},
+      // The evaluated Dating kill switch is always reported (off by default).
+      featureFlags: { dating_enabled: false },
       account: null,
     });
     expect(response.headers['cache-control']).toBe('no-store');

@@ -13,6 +13,8 @@ import {
   type ProfilePatch,
   type ProfileState,
 } from '../domain/profile.js';
+import { DATING_INTENT, type TopLevelIntentCode } from '../domain/intents.js';
+import type { IntentStore } from './intent-ports.js';
 import type { ProfileStore } from './ports.js';
 
 /** SelfUserDto content (AUTHORIZATION §XLI); shaped by the contract at the edge. */
@@ -26,6 +28,29 @@ export interface SelfUserView {
   readonly profile: ProfileState;
   readonly phoneMasked: string;
   readonly age: number;
+  /** Saved onboarding choices, self-only (restores O03/O04 state). */
+  readonly location: { readonly city: SelfCityView } | null;
+  readonly activeIntents: readonly TopLevelIntentCode[];
+  /**
+   * Derived from the DATING intent, which is active only with an active
+   * consent. Self projection only; consent details are never exposed.
+   */
+  readonly datingEnabled: boolean;
+}
+
+/** The saved city as the self projection needs it (city/metro context only). */
+export interface SelfCityView {
+  readonly id: string;
+  readonly name: string;
+  readonly stateRegion: string;
+  readonly countryCode: string;
+  readonly launchStatus: 'ACTIVE' | 'WAITLIST' | 'FUTURE' | 'DISABLED';
+  readonly metro: { readonly id: string; readonly code: string; readonly name: string };
+}
+
+/** Satisfied by the location module's public LocationQuery. */
+export interface MyCityReader {
+  findMyCity(userId: string): Promise<SelfCityView | undefined>;
 }
 
 export interface ProfileServiceDependencies {
@@ -33,6 +58,8 @@ export interface ProfileServiceDependencies {
   readonly profiles: ProfileStore;
   readonly onboarding: OnboardingProgressService;
   readonly selfAccount: SelfAccountQuery;
+  readonly locations: MyCityReader;
+  readonly intents: IntentStore;
   readonly analytics: AnalyticsTracker;
   readonly clock: Clock;
 }
@@ -41,9 +68,11 @@ export class ProfileService {
   constructor(private readonly deps: ProfileServiceDependencies) {}
 
   async getMe(userId: string): Promise<SelfUserView> {
-    const [account, profile] = await Promise.all([
+    const [account, profile, city, activeIntents] = await Promise.all([
       this.deps.selfAccount.getSelfAccount(userId),
       this.deps.profiles.repository.findProfile(userId),
+      this.deps.locations.findMyCity(userId),
+      this.deps.intents.repository.listActiveIntents(userId),
     ]);
     return {
       id: account.id,
@@ -52,6 +81,9 @@ export class ProfileService {
       profile: profile ?? EMPTY_PROFILE,
       phoneMasked: account.phoneMasked,
       age: account.age,
+      location: city === undefined ? null : { city },
+      activeIntents,
+      datingEnabled: activeIntents.includes(DATING_INTENT),
     };
   }
 

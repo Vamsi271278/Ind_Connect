@@ -14,7 +14,15 @@ export type AnalyticsEvent =
       readonly userId: string;
       /** Canonical onboarding_step code. duration_seconds is client-measured (B3). */
       readonly stepCode: string;
-    };
+    }
+  /** Analytics §81. Emitted only when Dating actually turns on (after commit). */
+  | {
+      readonly name: 'dating_enabled';
+      readonly userId: string;
+      readonly source: 'onboarding' | 'settings';
+    }
+  /** Analytics §82. Emitted only when Dating actually turns off (after commit). */
+  | { readonly name: 'dating_disabled'; readonly userId: string };
 
 /** Envelope fields the server can truthfully supply (Analytics §4). */
 export interface TrackedEvent {
@@ -54,6 +62,19 @@ export class AnalyticsTracker {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
+  /** Codes only: never names, intents, cities, policy versions or consent times. */
+  private static properties(event: AnalyticsEvent): TrackedEvent['properties'] {
+    switch (event.name) {
+      case 'onboarding_step_completed':
+        return { step_code: event.stepCode };
+      case 'dating_enabled':
+        return { source: event.source };
+      case 'otp_verified':
+      case 'dating_disabled':
+        return {};
+    }
+  }
+
   /** Keyed pseudonymous analytics identity; never the internal user UUID. */
   private pseudonym(userId: string | null): string | null {
     return userId === null ? null : this.hasher.hash('analytics-user', userId);
@@ -66,7 +87,7 @@ export class AnalyticsTracker {
       event_version: 1,
       occurred_at: this.now().toISOString(),
       user_id_pseudonymous: this.pseudonym(event.userId),
-      properties: event.name === 'onboarding_step_completed' ? { step_code: event.stepCode } : {},
+      properties: AnalyticsTracker.properties(event),
     };
     try {
       this.provider.publish(tracked).catch(() => {

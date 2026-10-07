@@ -59,6 +59,20 @@ describe('location failures', () => {
   });
 });
 
+describe('intent and dating failures', () => {
+  it('explain each outcome in plain language', () => {
+    for (const code of [
+      'INTENT_REQUIRED',
+      'DATING_NOT_ELIGIBLE',
+      'DATING_POLICY_OUTDATED',
+    ] as const) {
+      const failure = describeAuthFailure(api(409, code));
+      expect(failure.kind).toBe('banner');
+      expect(failure.kind === 'banner' ? failure.message : '').not.toMatch(/HTTP|409|code/i);
+    }
+  });
+});
+
 describe('describeNameIssue', () => {
   it('maps contract issue codes to copy', () => {
     expect(describeNameIssue('required', 'first name')).toBe('Enter your first name.');

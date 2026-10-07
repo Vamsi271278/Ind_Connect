@@ -126,4 +126,40 @@ describe('loadConfig', () => {
     expect(config.phone.hashPepper.reveal()).toBe(PEPPER);
     expect(new Secret('x').toJSON()).toBe('[REDACTED]');
   });
+
+  describe('dating kill switch', () => {
+    it('is off by default and is the only source of dating_enabled', () => {
+      const config = loadConfig(validEnv());
+      expect(config.dating).toEqual({ enabled: false, policyVersion: null });
+      expect(config.bootstrap.featureFlags).toMatchObject({ dating_enabled: false });
+      expect(
+        failure({ ...validEnv(), FEATURE_FLAGS: JSON.stringify({ dating_enabled: true }) }),
+      ).toContain('FEATURE_FLAGS');
+    });
+
+    it('requires a policy version when enabled', () => {
+      expect(failure({ ...validEnv(), DATING_ENABLED: 'true' })).toContain('DATING_POLICY_VERSION');
+      const config = loadConfig({
+        ...validEnv(),
+        DATING_ENABLED: 'true',
+        DATING_POLICY_VERSION: 'dating-draft-2026-10-v0',
+      });
+      expect(config.dating).toEqual({ enabled: true, policyVersion: 'dating-draft-2026-10-v0' });
+      expect(config.bootstrap.featureFlags).toMatchObject({ dating_enabled: true });
+    });
+
+    it('refuses a draft dating policy in production and malformed versions anywhere', () => {
+      expect(
+        failure({
+          ...validEnv(),
+          NODE_ENV: 'production',
+          DATING_ENABLED: 'true',
+          DATING_POLICY_VERSION: 'dating-draft-2026-10-v0',
+        }),
+      ).toContain('a draft dating policy version cannot be enabled in production');
+      expect(failure({ ...validEnv(), DATING_POLICY_VERSION: 'has spaces' })).toContain(
+        'DATING_POLICY_VERSION',
+      );
+    });
+  });
 });

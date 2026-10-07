@@ -6,6 +6,8 @@ import {
   onboardingStatusSchema,
   onboardingStepSchema,
 } from './enums.js';
+import { topLevelIntentCodeSchema } from './intents.js';
+import { citySchema } from './locations.js';
 import { firstNameSchema, genderSelfDescriptionSchema } from './profile.js';
 
 // ---------------------------------------------------------------- PATCH /users/me/profile
@@ -46,6 +48,11 @@ export type UpdateProfileBody = z.infer<typeof updateProfileBodySchema>;
  * SelfUserDto (AUTHORIZATION §XLI). Own-account projection only: masked phone
  * and server-computed age — never the raw phone, date of birth, session or
  * token-family identifiers, moderation state or database timestamps.
+ *
+ * `location`, `activeIntents` and `datingEnabled` restore saved onboarding
+ * choices. They are SELF-ONLY: `datingEnabled` must never appear on public or
+ * general profile DTOs (BR-DATE-008), and consent details (policy version,
+ * timestamps, source, history) are never returned.
  */
 export const selfUserSchema = z.strictObject({
   id: z.uuid(),
@@ -61,6 +68,9 @@ export const selfUserSchema = z.strictObject({
   }),
   phoneMasked: z.string(),
   age: z.int().min(18),
+  location: z.strictObject({ city: citySchema }).nullable(),
+  activeIntents: z.array(topLevelIntentCodeSchema),
+  datingEnabled: z.boolean(),
 });
 export type SelfUser = z.infer<typeof selfUserSchema>;
 
