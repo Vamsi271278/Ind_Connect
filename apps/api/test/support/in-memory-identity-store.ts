@@ -8,7 +8,10 @@ import {
   type LockedSession,
   type NewSession,
   type NewUser,
+  type LockedOnboarding,
+  type OnboardingState,
   PhoneAlreadyRegisteredError,
+  type SelfAccountFacts,
   type SessionRecord,
   type UserRecord,
 } from '../../src/modules/identity/application/ports.js';
@@ -48,6 +51,11 @@ export class InMemoryIdentityStore implements IdentityStore {
       this.state = snapshot;
       throw error;
     }
+  }
+
+  /** Single in-memory state: the shared transaction is the store itself. */
+  forTransaction(): IdentityRepository {
+    return this.repository;
   }
 
   session(id: string): StoredSession {
@@ -250,6 +258,31 @@ class InMemoryIdentityRepository implements IdentityRepository {
 
   appendAudit(entry: AuditEntry): Promise<void> {
     this.state().audit.push(entry);
+    return Promise.resolve();
+  }
+
+  findSelfAccountFacts(userId: string): Promise<SelfAccountFacts | undefined> {
+    const user = this.user(userId);
+    return Promise.resolve(user === undefined ? undefined : { ...user });
+  }
+
+  lockOnboarding(userId: string): Promise<LockedOnboarding | undefined> {
+    const user = this.user(userId);
+    return Promise.resolve(
+      user === undefined
+        ? undefined
+        : {
+            status: user.onboardingStatus,
+            step: user.onboardingStep,
+            accountStatus: user.accountStatus,
+          },
+    );
+  }
+
+  updateOnboarding(userId: string, state: OnboardingState): Promise<void> {
+    const user = this.user(userId);
+    if (user !== undefined)
+      Object.assign(user, { onboardingStatus: state.status, onboardingStep: state.step });
     return Promise.resolve();
   }
 }

@@ -49,6 +49,21 @@ export interface AppConfig {
   };
   readonly refresh: { readonly perFamilyPerHour: number };
   readonly idempotency: { readonly ttlSeconds: number; readonly lockSeconds: number };
+  /**
+   * ADR-094 / ADR-032 Dating kill switch (T&S §190: off until the release gate
+   * is met). `policyVersion` is the dating policy a consent is recorded
+   * against; it is required whenever Dating is enabled.
+   */
+  readonly dating: {
+    readonly enabled: boolean;
+    readonly policyVersion: string | null;
+  };
+  /** ADR-076 public bootstrap state (ADR-032 flag store not built yet: config only). */
+  readonly bootstrap: {
+    readonly maintenanceMode: boolean;
+    readonly minimumSupportedVersion: string;
+    readonly featureFlags: Readonly<Record<string, boolean>>;
+  };
 }
 
 const positiveInt = (fallback: number) => z.coerce.number().int().positive().default(fallback);
@@ -81,6 +96,24 @@ const countryPolicySchema = z
     }
     return { mode: 'allowlist', countries: new Set(codes) };
   });
+
+const booleanFlag = z.enum(['true', 'false']).transform((value) => value === 'true');
+
+const featureFlagsSchema = z.string().transform((raw, ctx): Record<string, boolean> => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = undefined;
+  }
+  const flags = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.boolean()).safeParse(parsed);
+  if (flags.success) return flags.data;
+  ctx.addIssue({
+    code: 'custom',
+    message: 'must be a JSON object of snake_case flag names to booleans',
+  });
+  return z.NEVER;
+});
 
 const ed25519PrivateKeySchema = z.string().transform((raw, ctx): KeyObject => {
   try {
@@ -137,6 +170,22 @@ const envSchema = z
 
     IDEMPOTENCY_TTL_SECONDS: positiveInt(3600),
     IDEMPOTENCY_LOCK_SECONDS: positiveInt(30),
+
+    MAINTENANCE_MODE: booleanFlag.default(false),
+    MOBILE_MINIMUM_SUPPORTED_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/)
+      .default('0.0.0'),
+    FEATURE_FLAGS: featureFlagsSchema.default({}),
+
+    // Off by default everywhere. Enable deliberately (local/staging testing),
+    // never just because the code exists.
+    DATING_ENABLED: booleanFlag.default(false),
+    // Same format as dating_consents.policy_version.
+    DATING_POLICY_VERSION: z
+      .string()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/)
+      .optional(),
   })
   .superRefine((env, ctx) => {
     // 'fake' is the only provider until the Twilio adapter is approved, so
@@ -146,6 +195,31 @@ const envSchema = z
         code: 'custom',
         path: ['OTP_PROVIDER'],
         message: 'the fake OTP provider can never run in production',
+      });
+    }
+    if ('dating_enabled' in env.FEATURE_FLAGS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['FEATURE_FLAGS'],
+        message: 'dating_enabled is controlled only by DATING_ENABLED',
+      });
+    }
+    if (env.DATING_ENABLED && env.DATING_POLICY_VERSION === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['DATING_POLICY_VERSION'],
+        message: 'is required when DATING_ENABLED=true',
+      });
+    }
+    if (
+      env.NODE_ENV === 'production' &&
+      env.DATING_ENABLED &&
+      /draft/i.test(env.DATING_POLICY_VERSION ?? '')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['DATING_POLICY_VERSION'],
+        message: 'a draft dating policy version cannot be enabled in production',
       });
     }
     if (env.SESSION_FAMILY_MAX_DAYS < env.REFRESH_TOKEN_ROLLING_DAYS) {
@@ -214,5 +288,15 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     },
     refresh: { perFamilyPerHour: e.REFRESHES_PER_FAMILY_PER_HOUR },
     idempotency: { ttlSeconds: e.IDEMPOTENCY_TTL_SECONDS, lockSeconds: e.IDEMPOTENCY_LOCK_SECONDS },
+    dating: {
+      enabled: e.DATING_ENABLED,
+      policyVersion: e.DATING_POLICY_VERSION ?? null,
+    },
+    bootstrap: {
+      maintenanceMode: e.MAINTENANCE_MODE,
+      minimumSupportedVersion: e.MOBILE_MINIMUM_SUPPORTED_VERSION,
+      // The evaluated kill switch is the only source of dating_enabled.
+      featureFlags: { ...e.FEATURE_FLAGS, dating_enabled: e.DATING_ENABLED },
+    },
   });
 }

@@ -4,7 +4,9 @@ import pg from 'pg';
 
 import type { AppConfig } from '../../config/app-config.js';
 import { APP_CONFIG } from '../../config/config.module.js';
+import { DrizzleUnitOfWork } from './drizzle-unit-of-work.js';
 import * as schema from './schema/index.js';
+import { UNIT_OF_WORK, type UnitOfWork } from './unit-of-work.js';
 
 export type Database = NodePgDatabase<typeof schema>;
 export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
@@ -35,8 +37,13 @@ export const PG_POOL = Symbol('PG_POOL');
       inject: [PG_POOL],
       useFactory: (pool: pg.Pool): Database => drizzle({ client: pool, schema }),
     },
+    {
+      provide: UNIT_OF_WORK,
+      inject: [DATABASE],
+      useFactory: (db: Database): UnitOfWork => new DrizzleUnitOfWork(db),
+    },
   ],
-  exports: [DATABASE, PG_POOL],
+  exports: [DATABASE, PG_POOL, UNIT_OF_WORK],
 })
 export class DatabaseModule implements OnModuleDestroy {
   constructor(@Inject(PG_POOL) private readonly pool: pg.Pool) {}

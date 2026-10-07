@@ -250,11 +250,16 @@ describe('OtpService.verify', () => {
           idempotencyKey: key,
         });
 
+      const verifiedBefore = h.analyticsProvider.names().filter((n) => n === 'otp_verified').length;
       const first = await call();
       const retry = await call();
       if (first.result !== 'authenticated' || retry.result !== 'authenticated')
         throw new Error('expected sessions');
 
+      // otp_verified fires once for the operation, never again on replay.
+      expect(h.analyticsProvider.names().filter((n) => n === 'otp_verified').length).toBe(
+        verifiedBefore + 1,
+      );
       expect(retry.session.sessionId).not.toBe(first.session.sessionId);
       expect(h.store.session(first.session.sessionId)).toMatchObject({
         revocationReason: 'REPLAY_REPLACED',

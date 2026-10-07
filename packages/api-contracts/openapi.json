@@ -1,0 +1,2831 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Project Connect Consumer API",
+    "version": "0.1.0",
+    "description": "Consumer API (`/api/v1`). Success responses use `{ \"data\": … }`; errors use the stable `{ \"error\": { code, message, correlationId } }` envelope. Clients branch on `error.code`."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth"
+    },
+    {
+      "name": "users"
+    },
+    {
+      "name": "locations"
+    },
+    {
+      "name": "profile"
+    },
+    {
+      "name": "dating"
+    },
+    {
+      "name": "app"
+    },
+    {
+      "name": "operations"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "operations"
+        ],
+        "summary": "Liveness (outside the /api/v1 namespace; not enveloped)",
+        "responses": {
+          "200": {
+            "description": "Process is serving HTTP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "service"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    },
+                    "service": {
+                      "const": "api"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/app/bootstrap": {
+      "get": {
+        "operationId": "getBootstrap",
+        "tags": [
+          "app"
+        ],
+        "summary": "Public app bootstrap state (ADR-076); account only with a valid access token",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bootstrap state",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/BootstrapResponse"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/otp/request": {
+      "post": {
+        "operationId": "requestOtp",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start a phone verification; identical response for every accepted number",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Code sent",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OtpRequestResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/otp/verify": {
+      "post": {
+        "operationId": "verifyOtp",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Verify the code; signs in an existing account or returns a registration token",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpVerifyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OtpVerifyResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/registrations": {
+      "post": {
+        "operationId": "register",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create the account from a registration token and date of birth (server age authority)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RegistrationResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "refreshSession",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Rotate the refresh token",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RefreshResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "tags": [
+          "auth"
+        ],
+        "summary": "End the sign-in that owns this refresh token (always 204)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Signed out",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout-all": {
+      "post": {
+        "operationId": "logoutAll",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke every session of the authenticated user",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "All sessions revoked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "operationId": "getMe",
+        "tags": [
+          "users"
+        ],
+        "summary": "Own-account projection (masked phone, computed age; never DOB)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Own account",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SelfUser"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/profile": {
+      "patch": {
+        "operationId": "updateMyProfile",
+        "tags": [
+          "users"
+        ],
+        "summary": "Update onboarding profile fields (first name, gender); advances onboarding",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated own account",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SelfUser"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/location": {
+      "patch": {
+        "operationId": "updateMyLocation",
+        "tags": [
+          "users"
+        ],
+        "summary": "Set the current city (manual selection; server derives metro/country). Allowed from the LOCATION onboarding step onward; advances LOCATION → INTENT",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyLocationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current location (city/metro only)",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MyLocationResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          }
+        }
+      }
+    },
+    "/api/v1/profile/intents": {
+      "get": {
+        "operationId": "listIntentOptions",
+        "tags": [
+          "profile"
+        ],
+        "summary": "Top-level intent options; DATING and the dating policy version only while the Dating kill switch is on",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Intent options",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/IntentOptionsResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    },
+    "/api/v1/profile/languages": {
+      "get": {
+        "operationId": "listLanguages",
+        "tags": [
+          "profile"
+        ],
+        "summary": "Active languages in display order (bounded reference data)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Languages",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/LanguageListResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    },
+    "/api/v1/profile/interests": {
+      "get": {
+        "operationId": "listInterests",
+        "tags": [
+          "profile"
+        ],
+        "summary": "Active interest categories, each with its active interests",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Interest catalog",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InterestCatalogResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/languages": {
+      "put": {
+        "operationId": "updateMyLanguages",
+        "tags": [
+          "users"
+        ],
+        "summary": "Replace the languages (at least 1, by code). Atomic: any unknown or inactive code fails the whole save. Allowed from LANGUAGE onward; advances LANGUAGE to INTERESTS",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyLanguagesBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved languages",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MyLanguagesResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/interests": {
+      "put": {
+        "operationId": "updateMyInterests",
+        "tags": [
+          "users"
+        ],
+        "summary": "Replace the interests (at least 3, by code). Atomic: any unknown or inactive code fails the whole save. Allowed from INTERESTS onward; advances INTERESTS to PHOTO",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyInterestsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved interests",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MyInterestsResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/intents": {
+      "put": {
+        "operationId": "updateMyIntents",
+        "tags": [
+          "users"
+        ],
+        "summary": "Replace the active non-dating intents (DATING changes only via dating consent). Allowed from INTENT onward; advances INTENT → LANGUAGE",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyIntentsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Active intents",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MyIntentsResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/dating/consent": {
+      "put": {
+        "operationId": "putMyDatingConsent",
+        "tags": [
+          "dating"
+        ],
+        "summary": "Affirmatively opt in to Dating for the current policy version; records consent and activates DATING atomically. Idempotent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutDatingConsentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dating enabled",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DatingConsentResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMyDatingConsent",
+        "tags": [
+          "dating"
+        ],
+        "summary": "Withdraw dating consent and deactivate DATING atomically. Never blocked (kill switch, onboarding step or intent minimum). Idempotent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Dating disabled",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          }
+        }
+      }
+    },
+    "/api/v1/locations/cities": {
+      "get": {
+        "operationId": "listCities",
+        "tags": [
+          "locations"
+        ],
+        "summary": "Selectable launch cities (bounded taxonomy; no coordinates)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Selectable cities",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CityListResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Ed25519-signed access token (15 minutes)."
+      }
+    },
+    "parameters": {
+      "CorrelationId": {
+        "name": "X-Correlation-ID",
+        "in": "header",
+        "required": false,
+        "description": "Optional client correlation ID (8–64 chars of [A-Za-z0-9-]); echoed back.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]{8,64}$"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "UUID per user submission; reuse it for network retries of the same submission. A different payload with the same key is rejected.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "headers": {
+      "CorrelationId": {
+        "description": "Request correlation ID",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Validation failure (VALIDATION_FAILED, PHONE_INVALID, OTP_EXPIRED, …)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Not authenticated (AUTH_REQUIRED, SESSION_INVALID)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Account or feature not available (ACCOUNT_NOT_ACTIVE, DATING_NOT_ELIGIBLE)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "State conflict (idempotency, uniqueness, ONBOARDING_STEP_NOT_REACHED, DATING_POLICY_OUTDATED)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error422": {
+        "description": "Business rule rejection (OTP_INCORRECT, AGE_NOT_ELIGIBLE, CITY_NOT_AVAILABLE, INTENT_REQUIRED)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "Rate limited; see Retry-After (RATE_LIMITED, OTP_ATTEMPTS_EXCEEDED)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Dependency unavailable; fails closed (OTP_UNAVAILABLE, SERVICE_UNAVAILABLE)",
+        "headers": {
+          "X-Correlation-ID": {
+            "$ref": "#/components/headers/CorrelationId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "VALIDATION_FAILED",
+                  "PHONE_INVALID",
+                  "PHONE_COUNTRY_NOT_SUPPORTED",
+                  "IDEMPOTENCY_KEY_REQUIRED",
+                  "AUTH_REQUIRED",
+                  "SESSION_INVALID",
+                  "ACCOUNT_NOT_ACTIVE",
+                  "IDEMPOTENCY_KEY_REUSED",
+                  "REQUEST_IN_PROGRESS",
+                  "REPLAY_UNAVAILABLE",
+                  "PHONE_ALREADY_REGISTERED",
+                  "OTP_INCORRECT",
+                  "OTP_EXPIRED",
+                  "OTP_ATTEMPTS_EXCEEDED",
+                  "REGISTRATION_TOKEN_INVALID",
+                  "AGE_NOT_ELIGIBLE",
+                  "ONBOARDING_STEP_NOT_REACHED",
+                  "CITY_NOT_AVAILABLE",
+                  "INTENT_REQUIRED",
+                  "DATING_NOT_ELIGIBLE",
+                  "DATING_POLICY_OUTDATED",
+                  "RATE_LIMITED",
+                  "OTP_UNAVAILABLE",
+                  "SERVICE_UNAVAILABLE",
+                  "NOT_FOUND",
+                  "INTERNAL_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "correlationId": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "properties": {
+                  "retryAfterSeconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "issues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "code"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "correlationId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "OtpRequestBody": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "installId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "phone",
+          "installId"
+        ],
+        "additionalProperties": false
+      },
+      "OtpRequestResponse": {
+        "type": "object",
+        "properties": {
+          "expiresInSeconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resendAvailableInSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "expiresInSeconds",
+          "resendAvailableInSeconds"
+        ],
+        "additionalProperties": false
+      },
+      "OtpVerifyBody": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "ios",
+                  "android"
+                ]
+              },
+              "appVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "osVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "installId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "platform",
+              "appVersion",
+              "osVersion",
+              "installId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "phone",
+          "code",
+          "device"
+        ],
+        "additionalProperties": false
+      },
+      "OtpVerifyResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "result": {
+                "type": "string",
+                "const": "authenticated"
+              },
+              "session": {
+                "type": "object",
+                "properties": {
+                  "accessToken": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "accessTokenExpiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "refreshToken": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  },
+                  "refreshTokenExpiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  }
+                },
+                "required": [
+                  "accessToken",
+                  "accessTokenExpiresAt",
+                  "refreshToken",
+                  "refreshTokenExpiresAt"
+                ],
+                "additionalProperties": false
+              },
+              "account": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "accountStatus": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "PENDING_VERIFICATION",
+                      "LIMITED",
+                      "UNDER_REVIEW",
+                      "SUSPENDED",
+                      "BANNED",
+                      "DEACTIVATED",
+                      "DELETION_PENDING",
+                      "DELETED"
+                    ]
+                  },
+                  "onboardingStatus": {
+                    "type": "string",
+                    "enum": [
+                      "NOT_STARTED",
+                      "IN_PROGRESS",
+                      "COMPLETE"
+                    ]
+                  },
+                  "onboardingStep": {
+                    "type": "string",
+                    "enum": [
+                      "AGE",
+                      "PHONE",
+                      "NAME",
+                      "GENDER",
+                      "LOCATION",
+                      "INTENT",
+                      "LANGUAGE",
+                      "INTERESTS",
+                      "PHOTO",
+                      "ABOUT",
+                      "VERIFICATION",
+                      "NOTIFICATIONS",
+                      "COMPLETE"
+                    ]
+                  }
+                },
+                "required": [
+                  "userId",
+                  "accountStatus",
+                  "onboardingStatus",
+                  "onboardingStep"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "result",
+              "session",
+              "account"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "result": {
+                "type": "string",
+                "const": "registration_required"
+              },
+              "registrationToken": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              "registrationTokenExpiresInSeconds": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "result",
+              "registrationToken",
+              "registrationTokenExpiresInSeconds"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "RegistrationBody": {
+        "type": "object",
+        "properties": {
+          "registrationToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "dateOfBirth": {
+            "type": "string"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "ios",
+                  "android"
+                ]
+              },
+              "appVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "osVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "installId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "platform",
+              "appVersion",
+              "osVersion",
+              "installId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "registrationToken",
+          "dateOfBirth",
+          "device"
+        ],
+        "additionalProperties": false
+      },
+      "RegistrationResponse": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "const": "authenticated"
+          },
+          "session": {
+            "type": "object",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "minLength": 1
+              },
+              "accessTokenExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "refreshToken": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              "refreshTokenExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "accessToken",
+              "accessTokenExpiresAt",
+              "refreshToken",
+              "refreshTokenExpiresAt"
+            ],
+            "additionalProperties": false
+          },
+          "account": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "accountStatus": {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "PENDING_VERIFICATION",
+                  "LIMITED",
+                  "UNDER_REVIEW",
+                  "SUSPENDED",
+                  "BANNED",
+                  "DEACTIVATED",
+                  "DELETION_PENDING",
+                  "DELETED"
+                ]
+              },
+              "onboardingStatus": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "onboardingStep": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "userId",
+              "accountStatus",
+              "onboardingStatus",
+              "onboardingStep"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "result",
+          "session",
+          "account"
+        ],
+        "additionalProperties": false
+      },
+      "RefreshBody": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "ios",
+                  "android"
+                ]
+              },
+              "appVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "osVersion": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "installId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "platform",
+              "appVersion",
+              "osVersion",
+              "installId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "refreshToken",
+          "device"
+        ],
+        "additionalProperties": false
+      },
+      "RefreshResponse": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "minLength": 1
+              },
+              "accessTokenExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "refreshToken": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              "refreshTokenExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "accessToken",
+              "accessTokenExpiresAt",
+              "refreshToken",
+              "refreshTokenExpiresAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "additionalProperties": false
+      },
+      "LogoutBody": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateProfileBody": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string"
+          },
+          "genderCode": {
+            "type": "string",
+            "enum": [
+              "WOMAN",
+              "MAN",
+              "NON_BINARY",
+              "SELF_DESCRIBE",
+              "PREFER_NOT_TO_SAY"
+            ]
+          },
+          "genderSelfDescription": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SelfUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "accountStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PENDING_VERIFICATION",
+              "LIMITED",
+              "UNDER_REVIEW",
+              "SUSPENDED",
+              "BANNED",
+              "DEACTIVATED",
+              "DELETION_PENDING",
+              "DELETED"
+            ]
+          },
+          "onboarding": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "step"
+            ],
+            "additionalProperties": false
+          },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "genderCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "WOMAN",
+                      "MAN",
+                      "NON_BINARY",
+                      "SELF_DESCRIBE",
+                      "PREFER_NOT_TO_SAY"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "genderSelfDescription": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "firstName",
+              "genderCode",
+              "genderSelfDescription"
+            ],
+            "additionalProperties": false
+          },
+          "phoneMasked": {
+            "type": "string"
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 9007199254740991
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "stateRegion": {
+                        "type": "string"
+                      },
+                      "countryCode": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{2}$"
+                      },
+                      "metro": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "launchStatus": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "WAITLIST",
+                          "FUTURE",
+                          "DISABLED"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "stateRegion",
+                      "countryCode",
+                      "metro",
+                      "launchStatus"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activeIntents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FRIENDSHIP",
+                "ACTIVITIES",
+                "NETWORKING",
+                "DATING"
+              ]
+            }
+          },
+          "datingEnabled": {
+            "type": "boolean"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,3}$"
+                },
+                "displayName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "displayName"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "categoryCode": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+                }
+              },
+              "required": [
+                "code",
+                "label",
+                "categoryCode"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "accountStatus",
+          "onboarding",
+          "profile",
+          "phoneMasked",
+          "age",
+          "location",
+          "activeIntents",
+          "datingEnabled",
+          "languages",
+          "interests"
+        ],
+        "additionalProperties": false
+      },
+      "BootstrapResponse": {
+        "type": "object",
+        "properties": {
+          "maintenanceMode": {
+            "type": "boolean"
+          },
+          "minimumSupportedVersion": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          },
+          "featureFlags": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "PENDING_VERIFICATION",
+                      "LIMITED",
+                      "UNDER_REVIEW",
+                      "SUSPENDED",
+                      "BANNED",
+                      "DEACTIVATED",
+                      "DELETION_PENDING",
+                      "DELETED"
+                    ]
+                  },
+                  "onboardingStatus": {
+                    "type": "string",
+                    "enum": [
+                      "NOT_STARTED",
+                      "IN_PROGRESS",
+                      "COMPLETE"
+                    ]
+                  },
+                  "onboardingStep": {
+                    "type": "string",
+                    "enum": [
+                      "AGE",
+                      "PHONE",
+                      "NAME",
+                      "GENDER",
+                      "LOCATION",
+                      "INTENT",
+                      "LANGUAGE",
+                      "INTERESTS",
+                      "PHOTO",
+                      "ABOUT",
+                      "VERIFICATION",
+                      "NOTIFICATIONS",
+                      "COMPLETE"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "onboardingStatus",
+                  "onboardingStep"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "maintenanceMode",
+          "minimumSupportedVersion",
+          "featureFlags",
+          "account"
+        ],
+        "additionalProperties": false
+      },
+      "CityListResponse": {
+        "type": "object",
+        "properties": {
+          "cities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "stateRegion": {
+                  "type": "string"
+                },
+                "countryCode": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$"
+                },
+                "metro": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "launchStatus": {
+                  "type": "string",
+                  "enum": [
+                    "ACTIVE",
+                    "WAITLIST",
+                    "FUTURE",
+                    "DISABLED"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "stateRegion",
+                "countryCode",
+                "metro",
+                "launchStatus"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "cities"
+        ],
+        "additionalProperties": false
+      },
+      "IntentOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "FRIENDSHIP",
+                    "ACTIVITIES",
+                    "NETWORKING",
+                    "DATING"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "code",
+                "label",
+                "description"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "dating": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "policyVersion": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
+                  }
+                },
+                "required": [
+                  "policyVersion"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "options",
+          "dating"
+        ],
+        "additionalProperties": false
+      },
+      "LanguageListResponse": {
+        "type": "object",
+        "properties": {
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,3}$"
+                },
+                "displayName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "displayName"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "languages"
+        ],
+        "additionalProperties": false
+      },
+      "InterestCatalogResponse": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "interests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "code",
+                "label",
+                "interests"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "categories"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateMyLanguagesBody": {
+        "type": "object",
+        "properties": {
+          "languages": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z]{2,3}$"
+            }
+          }
+        },
+        "required": [
+          "languages"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateMyInterestsBody": {
+        "type": "object",
+        "properties": {
+          "interests": {
+            "minItems": 3,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+            }
+          }
+        },
+        "required": [
+          "interests"
+        ],
+        "additionalProperties": false
+      },
+      "MyLanguagesResponse": {
+        "type": "object",
+        "properties": {
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,3}$"
+                },
+                "displayName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "displayName"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "onboarding": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "step"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "languages",
+          "onboarding"
+        ],
+        "additionalProperties": false
+      },
+      "MyInterestsResponse": {
+        "type": "object",
+        "properties": {
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "categoryCode": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+                }
+              },
+              "required": [
+                "code",
+                "label",
+                "categoryCode"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "onboarding": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "step"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "interests",
+          "onboarding"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateMyIntentsBody": {
+        "type": "object",
+        "properties": {
+          "intents": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FRIENDSHIP",
+                "ACTIVITIES",
+                "NETWORKING"
+              ]
+            }
+          }
+        },
+        "required": [
+          "intents"
+        ],
+        "additionalProperties": false
+      },
+      "MyIntentsResponse": {
+        "type": "object",
+        "properties": {
+          "activeIntents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "FRIENDSHIP",
+                "ACTIVITIES",
+                "NETWORKING",
+                "DATING"
+              ]
+            }
+          },
+          "onboarding": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "step"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "activeIntents",
+          "onboarding"
+        ],
+        "additionalProperties": false
+      },
+      "PutDatingConsentBody": {
+        "type": "object",
+        "properties": {
+          "policyVersion": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$"
+          }
+        },
+        "required": [
+          "policyVersion"
+        ],
+        "additionalProperties": false
+      },
+      "DatingConsentResponse": {
+        "type": "object",
+        "properties": {
+          "datingEnabled": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "datingEnabled"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateMyLocationBody": {
+        "type": "object",
+        "properties": {
+          "cityId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "cityId"
+        ],
+        "additionalProperties": false
+      },
+      "MyLocationResponse": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "stateRegion": {
+                    "type": "string"
+                  },
+                  "countryCode": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$"
+                  },
+                  "metro": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "code",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "launchStatus": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "WAITLIST",
+                      "FUTURE",
+                      "DISABLED"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "stateRegion",
+                  "countryCode",
+                  "metro",
+                  "launchStatus"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "city"
+            ],
+            "additionalProperties": false
+          },
+          "onboarding": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "COMPLETE"
+                ]
+              },
+              "step": {
+                "type": "string",
+                "enum": [
+                  "AGE",
+                  "PHONE",
+                  "NAME",
+                  "GENDER",
+                  "LOCATION",
+                  "INTENT",
+                  "LANGUAGE",
+                  "INTERESTS",
+                  "PHOTO",
+                  "ABOUT",
+                  "VERIFICATION",
+                  "NOTIFICATIONS",
+                  "COMPLETE"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "step"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "location",
+          "onboarding"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

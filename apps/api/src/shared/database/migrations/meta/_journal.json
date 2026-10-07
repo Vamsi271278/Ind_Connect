@@ -8,6 +8,27 @@
       "when": 1791168581785,
       "tag": "0000_identity_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791244773637,
+      "tag": "0001_location_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791249429554,
+      "tag": "0002_intent_dating_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791337468981,
+      "tag": "0003_languages_interests_foundation",
+      "breakpoints": true
     }
   ]
 }

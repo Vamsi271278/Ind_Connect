@@ -29,6 +29,17 @@ export const ERROR_PRESENTATION: Readonly<Record<ErrorCode, ErrorPresentation>> 
   OTP_ATTEMPTS_EXCEEDED: { status: 429, message: 'Too many attempts. Request a new code.' },
   REGISTRATION_TOKEN_INVALID: { status: 400, message: 'Please verify your number again.' },
   AGE_NOT_ELIGIBLE: { status: 422, message: 'You must be 18 or older to use Project Connect.' },
+  ONBOARDING_STEP_NOT_REACHED: { status: 409, message: 'Please finish the earlier steps first.' },
+  INTENT_REQUIRED: { status: 422, message: 'Choose at least one option.' },
+  DATING_NOT_ELIGIBLE: { status: 403, message: 'Dating is not available right now.' },
+  DATING_POLICY_OUTDATED: {
+    status: 409,
+    message: 'The dating terms have changed. Please review them again.',
+  },
+  CITY_NOT_AVAILABLE: {
+    status: 422,
+    message: 'This city is not available yet. Please choose another.',
+  },
   RATE_LIMITED: { status: 429, message: 'Too many requests. Please try again later.' },
   OTP_UNAVAILABLE: {
     status: 503,

@@ -2,16 +2,24 @@ import { Logger, Module } from '@nestjs/common';
 
 import type { AppConfig } from '../../config/app-config.js';
 import { APP_CONFIG } from '../../config/config.module.js';
+import { ANALYTICS, type AnalyticsTracker } from '../../shared/analytics/analytics.js';
 import { KeyedHasher } from '../../shared/crypto/crypto.js';
 import { type Database, DATABASE } from '../../shared/database/database.module.js';
 import { EPHEMERAL_STORE, type EphemeralStore } from '../../shared/redis/ephemeral-store.js';
 import { AccessTokenGuard } from './api/auth.guard.js';
 import { AuthController } from './api/auth.controller.js';
-import { OTP_SERVICE, REGISTRATION_SERVICE, SESSION_SERVICE } from './api/tokens.js';
+import {
+  ONBOARDING_PROGRESS,
+  OTP_SERVICE,
+  REGISTRATION_SERVICE,
+  SELF_ACCOUNT_QUERY,
+  SESSION_SERVICE,
+} from './api/tokens.js';
 import { IdempotencyRecords } from './application/ephemeral/idempotency-records.js';
 import { OtpChallenges } from './application/ephemeral/otp-challenges.js';
 import { RateLimiter } from './application/ephemeral/rate-limiter.js';
 import { RegistrationTokens } from './application/ephemeral/registration-tokens.js';
+import { OnboardingProgressService } from './application/onboarding-progress.service.js';
 import { OtpService } from './application/otp.service.js';
 import {
   ACCESS_TOKEN_SERVICE,
@@ -24,6 +32,7 @@ import {
   type PhoneVerificationProvider,
 } from './application/ports.js';
 import { RegistrationService } from './application/registration.service.js';
+import { SelfAccountQuery } from './application/self-account.query.js';
 import { SessionService } from './application/session.service.js';
 import { FakePhoneVerificationProvider } from './infrastructure/otp/fake-phone-verification.provider.js';
 import { DrizzleIdentityStore } from './infrastructure/persistence/drizzle-identity.store.js';
@@ -150,6 +159,7 @@ const logger = new Logger('Identity');
         KEYED_HASHER,
         CLOCK,
         APP_CONFIG,
+        ANALYTICS,
       ],
       useFactory: (
         provider: PhoneVerificationProvider,
@@ -162,6 +172,7 @@ const logger = new Logger('Identity');
         hasher: KeyedHasher,
         clock: Clock,
         config: AppConfig,
+        analytics: AnalyticsTracker,
       ) =>
         new OtpService(
           {
@@ -176,6 +187,7 @@ const logger = new Logger('Identity');
             countryPolicy: config.phone.countryPolicy,
             clock,
             logger,
+            analytics,
           },
           {
             codeTtlSeconds: config.otp.codeTtlSeconds,
@@ -218,7 +230,20 @@ const logger = new Logger('Identity');
           { perIpPerHour: config.registration.perIpPerHour },
         ),
     },
+    {
+      provide: ONBOARDING_PROGRESS,
+      inject: [IDENTITY_STORE, CLOCK],
+      useFactory: (store: IdentityStore, clock: Clock) =>
+        new OnboardingProgressService(store, clock),
+    },
+    {
+      provide: SELF_ACCOUNT_QUERY,
+      inject: [IDENTITY_STORE, CLOCK],
+      useFactory: (store: IdentityStore, clock: Clock) => new SelfAccountQuery(store, clock),
+    },
     AccessTokenGuard,
   ],
+  // Identity's public surface for other modules. Persistence stays private.
+  exports: [SESSION_SERVICE, ONBOARDING_PROGRESS, SELF_ACCOUNT_QUERY, AccessTokenGuard],
 })
 export class IdentityModule {}

@@ -19,7 +19,26 @@ import { RegistrationService } from '../../src/modules/identity/application/regi
 import { SessionService } from '../../src/modules/identity/application/session.service.js';
 import { FakePhoneVerificationProvider } from '../../src/modules/identity/infrastructure/otp/fake-phone-verification.provider.js';
 import { JoseAccessTokenService } from '../../src/modules/identity/infrastructure/tokens/jose-access-token.service.js';
+import { BootstrapService } from '../../src/modules/configuration/application/bootstrap.service.js';
+import { OnboardingProgressService } from '../../src/modules/identity/application/onboarding-progress.service.js';
+import { SelfAccountQuery } from '../../src/modules/identity/application/self-account.query.js';
+import { DatingConsentService } from '../../src/modules/dating/application/dating-consent.service.js';
+import { LocationQuery } from '../../src/modules/location/application/location.query.js';
+import { LocationService } from '../../src/modules/location/application/location.service.js';
+import {
+  DatingIntentWriter,
+  type DatingAvailability,
+  IntentService,
+} from '../../src/modules/profile/application/intent.service.js';
+import { ProfileService } from '../../src/modules/profile/application/profile.service.js';
+import { TaxonomyService } from '../../src/modules/profile/application/taxonomy.service.js';
+import { AnalyticsTracker } from '../../src/shared/analytics/analytics.js';
 import { KeyedHasher } from '../../src/shared/crypto/crypto.js';
+import { InMemoryAnalyticsProvider } from './in-memory-analytics.js';
+import { InMemoryDatingConsentStore, InMemoryIntentStore } from './in-memory-intents.js';
+import { InMemoryLocationStore } from './in-memory-location.js';
+import { InMemoryProfileStore, InMemoryUnitOfWork } from './in-memory-profile.js';
+import { InMemoryTaxonomyStore } from './in-memory-taxonomy.js';
 import { InMemoryEphemeralStore } from './in-memory-ephemeral-store.js';
 import { InMemoryIdentityStore } from './in-memory-identity-store.js';
 import { ManualClock } from './manual-clock.js';
@@ -70,14 +89,17 @@ export function createIdentityHarness(
     readonly countryPolicy?: CountryPolicy;
     readonly provider?: PhoneVerificationProvider;
     readonly settings?: Partial<OtpSettings>;
+    readonly dating?: DatingAvailability;
   } = {},
 ) {
   const clock = new ManualClock('2026-10-05T12:00:00.000Z');
   const ephemeral = new InMemoryEphemeralStore(clock);
   const store = new InMemoryIdentityStore();
   const logger = new CapturingLogger();
+  const analyticsProvider = new InMemoryAnalyticsProvider();
   const settings = { ...OTP_SETTINGS, ...options.settings };
   const hasher = new KeyedHasher(new Secret('test-pepper-0123456789abcdef0123456789'));
+  const analytics = new AnalyticsTracker(analyticsProvider, hasher, logger, () => clock.now());
   const rateLimiter = new RateLimiter(ephemeral);
   const idempotency = new IdempotencyRecords(ephemeral, { ttlMs: 3_600_000, lockMs: 30_000 });
   const registrationTokens = new RegistrationTokens(
@@ -127,12 +149,86 @@ export function createIdentityHarness(
       countryPolicy: options.countryPolicy ?? { mode: 'all' },
       clock,
       logger,
+      analytics,
     },
     settings,
   );
   const registration = new RegistrationService(
     { registrationTokens, idempotency, rateLimiter, store, sessions, hasher, clock, logger },
     { perIpPerHour: 20 },
+  );
+
+  const profiles = new InMemoryProfileStore();
+  const locations = new InMemoryLocationStore();
+  const intents = new InMemoryIntentStore();
+  const consents = new InMemoryDatingConsentStore();
+  const taxonomy = new InMemoryTaxonomyStore();
+  const unitOfWork = new InMemoryUnitOfWork(store, [
+    profiles,
+    locations,
+    intents,
+    consents,
+    taxonomy,
+  ]);
+  // Dating defaults to ON in the harness so its behavior is testable; the
+  // kill-switch tests pass { enabled: false } explicitly.
+  const dating: DatingAvailability = options.dating ?? {
+    enabled: true,
+    policyVersion: 'dating-test-v1',
+  };
+  const onboarding = new OnboardingProgressService(store, clock);
+  const selfAccount = new SelfAccountQuery(store, clock);
+  const profileService = new ProfileService({
+    unitOfWork,
+    profiles,
+    onboarding,
+    selfAccount,
+    locations: new LocationQuery(locations),
+    intents,
+    taxonomy,
+    analytics,
+    clock,
+  });
+  const taxonomyService = new TaxonomyService({
+    unitOfWork,
+    taxonomy,
+    onboarding,
+    analytics,
+    clock,
+  });
+  const intentService = new IntentService({
+    unitOfWork,
+    intents,
+    onboarding,
+    analytics,
+    clock,
+    dating,
+  });
+  const datingConsentService = new DatingConsentService({
+    unitOfWork,
+    consents,
+    datingIntent: new DatingIntentWriter(intents),
+    onboarding,
+    analytics,
+    clock,
+    dating,
+  });
+  const locationService = new LocationService({
+    unitOfWork,
+    locations,
+    onboarding,
+    analytics,
+    clock,
+  });
+  const bootstrap = new BootstrapService(
+    {
+      maintenanceMode: false,
+      minimumSupportedVersion: '1.0.0',
+      featureFlags: { dating_enabled: false },
+    },
+    sessions,
+    selfAccount,
+    logger,
   );
 
   /** Full sign-up: request → verify → register. */
@@ -156,6 +252,21 @@ export function createIdentityHarness(
   }
 
   return {
+    analyticsProvider,
+    profiles,
+    unitOfWork,
+    onboarding,
+    selfAccount,
+    profileService,
+    locations,
+    locationService,
+    intents,
+    consents,
+    intentService,
+    datingConsentService,
+    taxonomy,
+    taxonomyService,
+    bootstrap,
     clock,
     ephemeral,
     store,

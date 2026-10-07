@@ -1,3 +1,4 @@
+import type { TransactionContext } from '../../../shared/database/unit-of-work.js';
 import type { AccountStatus, OnboardingStatus, OnboardingStep } from '../domain/account.js';
 import type { RevocationReason } from '../domain/session-policy.js';
 
@@ -76,6 +77,23 @@ export interface AuthSessionView {
   readonly accountStatus: AccountStatus;
 }
 
+/** Identity-private facts for the self projection; never leave the module raw. */
+export interface SelfAccountFacts extends UserRecord {
+  readonly phoneE164: string;
+  /** YYYY-MM-DD */
+  readonly dateOfBirth: string;
+}
+
+export interface OnboardingState {
+  readonly status: OnboardingStatus;
+  readonly step: OnboardingStep;
+}
+
+/** Onboarding state read under the user row lock, with the account status. */
+export interface LockedOnboarding extends OnboardingState {
+  readonly accountStatus: AccountStatus;
+}
+
 export interface AuditEntry {
   readonly actorType: 'USER' | 'SYSTEM';
   readonly actorId: string | null;
@@ -119,11 +137,18 @@ export interface IdentityRepository {
   markSessionUsed(sessionId: string, at: Date): Promise<void>;
 
   appendAudit(entry: AuditEntry): Promise<void>;
+
+  findSelfAccountFacts(userId: string): Promise<SelfAccountFacts | undefined>;
+  /** Row-locks the user (FOR UPDATE): serializes profile/onboarding writes per user. */
+  lockOnboarding(userId: string): Promise<LockedOnboarding | undefined>;
+  updateOnboarding(userId: string, state: OnboardingState, at: Date): Promise<void>;
 }
 
 export interface IdentityStore {
   readonly repository: IdentityRepository;
   transaction<T>(work: (repository: IdentityRepository) => Promise<T>): Promise<T>;
+  /** Identity repository bound to a cross-module transaction (UnitOfWork). */
+  forTransaction(tx: TransactionContext): IdentityRepository;
 }
 
 // ---------------------------------------------------------------- providers

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -10,7 +10,23 @@ import type { Database } from '../../src/shared/database/database.module.js';
 import * as schema from '../../src/shared/database/schema/index.js';
 import { resetDatabase } from '../support/integration-db.js';
 
-const { users, userSessions, userProfiles, genderOptions } = schema;
+const {
+  users,
+  userSessions,
+  userProfiles,
+  genderOptions,
+  metros,
+  cities,
+  userLocations,
+  intentOptions,
+  userIntents,
+  datingConsents,
+  languages,
+  userLanguages,
+  interestCategories,
+  interests,
+  userInterests,
+} = schema;
 
 let pool: pg.Pool;
 let db: Database;
@@ -274,5 +290,395 @@ describe('transactions', () => {
       .from(users)
       .where(eq(users.phoneE164, '+12145550199'));
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('metros / cities / user_locations', () => {
+  const dfw = async () => {
+    const [row] = await db.select().from(metros).where(eq(metros.code, 'DFW'));
+    if (row === undefined) throw new Error('DFW seed missing');
+    return row;
+  };
+  const city = async (name: string) => {
+    const [row] = await db.select().from(cities).where(eq(cities.name, name));
+    if (row === undefined) throw new Error(`no city ${name}`);
+    return row;
+  };
+  const newUser = async (phone: string) => {
+    const [row] = await db
+      .insert(users)
+      .values(userValues({ phoneE164: phone, onboardingStep: 'LOCATION' }))
+      .returning();
+    if (row === undefined) throw new Error('user insert failed');
+    return row;
+  };
+  const manual = (
+    userId: string,
+    c: typeof cities.$inferSelect,
+    overrides: Partial<typeof userLocations.$inferInsert> = {},
+  ): typeof userLocations.$inferInsert => ({
+    userId,
+    cityId: c.id,
+    metroId: c.metroId,
+    countryCode: c.countryCode,
+    precisionType: 'MANUAL_CITY',
+    source: 'MANUAL',
+    capturedAt: new Date(),
+    ...overrides,
+  });
+
+  it('seeds the DFW metro and the 14 owner-approved ACTIVE cities', async () => {
+    expect(await dfw()).toMatchObject({
+      name: 'Dallas–Fort Worth',
+      countryCode: 'US',
+      timezone: 'America/Chicago',
+      launchStatus: 'ACTIVE',
+    });
+    const rows = await db
+      .select()
+      .from(cities)
+      .where(eq(cities.metroId, (await dfw()).id));
+    expect(rows.map((r) => r.name).sort()).toEqual(
+      [
+        'Allen',
+        'Arlington',
+        'Carrollton',
+        'Coppell',
+        'Dallas',
+        'Denton',
+        'Fort Worth',
+        'Frisco',
+        'Irving',
+        'Lewisville',
+        'McKinney',
+        'Plano',
+        'Prosper',
+        'Richardson',
+      ].sort(),
+    );
+    for (const row of rows) {
+      expect(row).toMatchObject({ stateRegion: 'TX', countryCode: 'US', launchStatus: 'ACTIVE' });
+    }
+  });
+
+  it('stores no coordinates anywhere in the location tables', async () => {
+    const result = await db.execute<{ column_name: string }>(
+      sql`SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name IN ('metros', 'cities', 'user_locations')`,
+    );
+    const columns = result.rows.map((r) => r.column_name);
+    for (const forbidden of ['latitude', 'longitude', 'location', 'geom', 'point']) {
+      expect(columns).not.toContain(forbidden);
+    }
+  });
+
+  it('accepts a consistent manual location, one row per user', async () => {
+    const user = await newUser('+12145550601');
+    await db.insert(userLocations).values(manual(user.id, await city('Frisco')));
+    expect(
+      await sqlState(db.insert(userLocations).values(manual(user.id, await city('Plano')))),
+    ).toBe('23505');
+  });
+
+  it('rejects a metro or country that does not match the city (composite FK)', async () => {
+    const user = await newUser('+12145550602');
+    const frisco = await city('Frisco');
+    const [other] = await db
+      .insert(metros)
+      .values({
+        code: 'ZZFK',
+        name: 'FK test',
+        countryCode: 'US',
+        timezone: 'UTC',
+        launchStatus: 'FUTURE',
+      })
+      .returning();
+    if (other === undefined) throw new Error('fixture metro');
+    try {
+      expect(
+        await sqlState(
+          db.insert(userLocations).values(manual(user.id, frisco, { metroId: other.id })),
+        ),
+      ).toBe('23503');
+      expect(
+        await sqlState(
+          db.insert(userLocations).values(manual(user.id, frisco, { countryCode: 'IN' })),
+        ),
+      ).toBe('23503');
+      // A city's country must match its metro's country.
+      expect(
+        await sqlState(
+          db.insert(cities).values({
+            metroId: (await dfw()).id,
+            name: 'Elsewhere',
+            stateRegion: 'MH',
+            countryCode: 'IN',
+            launchStatus: 'ACTIVE',
+          }),
+        ),
+      ).toBe('23503');
+    } finally {
+      await db.delete(metros).where(eq(metros.id, other.id));
+    }
+  });
+
+  it('allows only MANUAL_CITY / MANUAL in this slice', async () => {
+    const user = await newUser('+12145550603');
+    const frisco = await city('Frisco');
+    for (const overrides of [
+      { precisionType: 'DEVICE' },
+      { precisionType: 'APPROXIMATE' },
+      { source: 'GPS' },
+      { source: 'IP_APPROXIMATION' },
+    ]) {
+      expect(
+        await sqlState(db.insert(userLocations).values(manual(user.id, frisco, overrides))),
+      ).toBe('23514');
+    }
+  });
+
+  it('enforces reference-data shape: unique city per region, valid codes and statuses', async () => {
+    const metroId = (await dfw()).id;
+    const base = { metroId, stateRegion: 'TX', countryCode: 'US', launchStatus: 'ACTIVE' };
+    expect(await sqlState(db.insert(cities).values({ ...base, name: 'Frisco' }))).toBe('23505');
+    expect(await sqlState(db.insert(cities).values({ ...base, name: '  ' }))).toBe('23514');
+    expect(
+      await sqlState(db.insert(cities).values({ ...base, name: 'Nowhere', launchStatus: 'OPEN' })),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(metros).values({
+          code: 'dfw2',
+          name: 'Lower',
+          countryCode: 'US',
+          timezone: 'UTC',
+          launchStatus: 'ACTIVE',
+        }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(metros).values({
+          code: 'DFW',
+          name: 'Duplicate',
+          countryCode: 'US',
+          timezone: 'UTC',
+          launchStatus: 'ACTIVE',
+        }),
+      ),
+    ).toBe('23505');
+  });
+});
+
+describe('intent_options / user_intents / dating_consents', () => {
+  const newUser = async (phone: string) => {
+    const [row] = await db
+      .insert(users)
+      .values(userValues({ phoneE164: phone, onboardingStep: 'INTENT' }))
+      .returning();
+    if (row === undefined) throw new Error('user insert failed');
+    return row;
+  };
+  const consent = (
+    userId: string,
+    overrides: Partial<typeof datingConsents.$inferInsert> = {},
+  ): typeof datingConsents.$inferInsert => ({
+    userId,
+    policyVersion: 'dating-draft-2026-10-v0',
+    source: 'ONBOARDING',
+    consentedAt: new Date('2026-10-06T12:00:00Z'),
+    ...overrides,
+  });
+
+  it('seeds four top-level intents and two dating sub-intents', async () => {
+    const rows = await db.select().from(intentOptions);
+    const shape = rows.map((r) => `${r.code}:${r.parentCode ?? '-'}`).sort();
+    expect(shape).toEqual(
+      [
+        'ACTIVITIES:-',
+        'CASUAL_DATING:DATING',
+        'DATING:-',
+        'FRIENDSHIP:-',
+        'NETWORKING:-',
+        'SERIOUS_RELATIONSHIP:DATING',
+      ].sort(),
+    );
+    expect(rows.every((r) => r.active)).toBe(true);
+  });
+
+  it('rejects a self-parented or unknown-parent option', async () => {
+    const base = { label: 'X', displayOrder: 9 };
+    expect(
+      await sqlState(
+        db.insert(intentOptions).values({ ...base, code: 'LOOP', parentCode: 'LOOP' }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(intentOptions).values({ ...base, code: 'ORPHAN', parentCode: 'NOPE' }),
+      ),
+    ).toBe('23503');
+  });
+
+  it('keeps user_intents consistent: one row per (user, intent), active ⇔ not deselected', async () => {
+    const user = await newUser('+12145550701');
+    const at = new Date('2026-10-06T12:00:00Z');
+    await db
+      .insert(userIntents)
+      .values({ userId: user.id, intentCode: 'FRIENDSHIP', active: true, selectedAt: at });
+    expect(
+      await sqlState(
+        db
+          .insert(userIntents)
+          .values({ userId: user.id, intentCode: 'FRIENDSHIP', active: true, selectedAt: at }),
+      ),
+    ).toBe('23505');
+    expect(
+      await sqlState(
+        db
+          .insert(userIntents)
+          .values({ userId: user.id, intentCode: 'ACTIVITIES', active: false, selectedAt: at }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(userIntents).values({
+          userId: user.id,
+          intentCode: 'NETWORKING',
+          active: true,
+          selectedAt: at,
+          deselectedAt: at,
+        }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db
+          .insert(userIntents)
+          .values({ userId: user.id, intentCode: 'HOOKUP', active: true, selectedAt: at }),
+      ),
+    ).toBe('23503');
+  });
+
+  it('allows at most one active consent per user, with unlimited revoked history', async () => {
+    const user = await newUser('+12145550702');
+    const revokedAt = new Date('2026-10-06T13:00:00Z');
+    await db.insert(datingConsents).values(consent(user.id, { revokedAt }));
+    await db.insert(datingConsents).values(consent(user.id, { revokedAt }));
+    await db.insert(datingConsents).values(consent(user.id));
+    expect(await sqlState(db.insert(datingConsents).values(consent(user.id)))).toBe('23505');
+  });
+
+  it('validates consent source, version format and revocation order', async () => {
+    const user = await newUser('+12145550703');
+    expect(
+      await sqlState(db.insert(datingConsents).values(consent(user.id, { source: 'INFERRED' }))),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(datingConsents).values(consent(user.id, { policyVersion: 'has spaces' })),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db
+          .insert(datingConsents)
+          .values(consent(user.id, { revokedAt: new Date('2026-10-06T11:00:00Z') })),
+      ),
+    ).toBe('23514');
+  });
+});
+
+describe('languages / interests taxonomy', () => {
+  const newUser = async (phone: string) => {
+    const [row] = await db
+      .insert(users)
+      .values(userValues({ phoneE164: phone, onboardingStep: 'LANGUAGE' }))
+      .returning();
+    if (row === undefined) throw new Error('user insert failed');
+    return row;
+  };
+  const interestId = async (code: string) => {
+    const [row] = await db
+      .select({ id: interests.id })
+      .from(interests)
+      .where(eq(interests.code, code));
+    if (row === undefined) throw new Error(`no interest ${code}`);
+    return row.id;
+  };
+
+  it('seeds 12 languages, 6 categories and 38 interests, all active', async () => {
+    const langs = await db.select().from(languages);
+    const categories = await db.select().from(interestCategories);
+    const all = await db.select().from(interests);
+    expect([langs.length, categories.length, all.length]).toEqual([12, 6, 38]);
+    expect([...langs, ...categories, ...all].every((r) => r.active)).toBe(true);
+    expect(new Set(all.map((i) => i.code)).size).toBe(38);
+  });
+
+  it('allows each language and interest once per user, and only known ones', async () => {
+    const user = await newUser('+12145550901');
+    await db.insert(userLanguages).values({ userId: user.id, languageCode: 'en' });
+    expect(
+      await sqlState(db.insert(userLanguages).values({ userId: user.id, languageCode: 'en' })),
+    ).toBe('23505');
+    expect(
+      await sqlState(db.insert(userLanguages).values({ userId: user.id, languageCode: 'xx' })),
+    ).toBe('23503');
+
+    const cricket = await interestId('CRICKET');
+    await db.insert(userInterests).values({ userId: user.id, interestId: cricket });
+    expect(
+      await sqlState(db.insert(userInterests).values({ userId: user.id, interestId: cricket })),
+    ).toBe('23505');
+    expect(
+      await sqlState(
+        db
+          .insert(userInterests)
+          .values({ userId: user.id, interestId: '00000000-0000-4000-8000-000000000000' }),
+      ),
+    ).toBe('23503');
+  });
+
+  it('enforces reference-data codes, uniqueness and categories', async () => {
+    expect(
+      await sqlState(
+        db.insert(languages).values({ code: 'English', displayName: 'X', displayOrder: 99 }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(languages).values({ code: 'en', displayName: 'X', displayOrder: 99 }),
+      ),
+    ).toBe('23505');
+    const [sports] = await db
+      .select()
+      .from(interestCategories)
+      .where(eq(interestCategories.code, 'SPORTS'));
+    if (sports === undefined) throw new Error('no SPORTS');
+    expect(
+      await sqlState(
+        db
+          .insert(interests)
+          .values({ code: 'CRICKET', label: 'X', categoryId: sports.id, displayOrder: 99 }),
+      ),
+    ).toBe('23505');
+    expect(
+      await sqlState(
+        db
+          .insert(interests)
+          .values({ code: 'chess', label: 'Chess', categoryId: sports.id, displayOrder: 99 }),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlState(
+        db.insert(interests).values({
+          code: 'CHESS',
+          label: 'Chess',
+          categoryId: '00000000-0000-4000-8000-000000000000',
+          displayOrder: 99,
+        }),
+      ),
+    ).toBe('23503');
   });
 });

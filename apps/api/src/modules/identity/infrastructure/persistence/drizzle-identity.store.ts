@@ -2,6 +2,8 @@ import { deviceContextSchema } from '@project-connect/api-contracts';
 import { and, eq, isNull, min, ne, sql } from 'drizzle-orm';
 
 import type { Database, DbExecutor } from '../../../../shared/database/database.module.js';
+import { executorOf } from '../../../../shared/database/drizzle-unit-of-work.js';
+import type { TransactionContext } from '../../../../shared/database/unit-of-work.js';
 import { auditEvents, userSessions, users } from '../../../../shared/database/schema/index.js';
 import { currentCorrelationId } from '../../../../shared/observability/request-context.js';
 import {
@@ -19,7 +21,10 @@ import {
   type LockedSession,
   type NewSession,
   type NewUser,
+  type LockedOnboarding,
+  type OnboardingState,
   PhoneAlreadyRegisteredError,
+  type SelfAccountFacts,
   type SessionRecord,
   type UserRecord,
 } from '../../application/ports.js';
@@ -293,6 +298,40 @@ export class DrizzleIdentityRepository implements IdentityRepository {
       metadata: entry.metadata ?? null,
     });
   }
+
+  async findSelfAccountFacts(userId: string): Promise<SelfAccountFacts | undefined> {
+    const [row] = await this.db
+      .select({ ...userColumns, phoneE164: users.phoneE164, dateOfBirth: users.dateOfBirth })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return row === undefined
+      ? undefined
+      : { ...toUser(row), phoneE164: row.phoneE164, dateOfBirth: row.dateOfBirth };
+  }
+
+  async lockOnboarding(userId: string): Promise<LockedOnboarding | undefined> {
+    const [row] = await this.db
+      .select(userColumns)
+      .from(users)
+      .where(eq(users.id, userId))
+      .for('update')
+      .limit(1);
+    if (row === undefined) return undefined;
+    const user = toUser(row);
+    return {
+      status: user.onboardingStatus,
+      step: user.onboardingStep,
+      accountStatus: user.accountStatus,
+    };
+  }
+
+  async updateOnboarding(userId: string, state: OnboardingState, at: Date): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ onboardingStatus: state.status, onboardingStep: state.step, updatedAt: at })
+      .where(eq(users.id, userId));
+  }
 }
 
 export class DrizzleIdentityStore implements IdentityStore {
@@ -304,5 +343,9 @@ export class DrizzleIdentityStore implements IdentityStore {
 
   transaction<T>(work: (repository: IdentityRepository) => Promise<T>): Promise<T> {
     return this.db.transaction((tx) => work(new DrizzleIdentityRepository(tx)));
+  }
+
+  forTransaction(tx: TransactionContext): IdentityRepository {
+    return new DrizzleIdentityRepository(executorOf(tx));
   }
 }
